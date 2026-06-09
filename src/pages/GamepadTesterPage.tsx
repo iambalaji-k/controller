@@ -15,7 +15,7 @@ const StickVisualizer: React.FC<{
   title: string;
   x: number;
   y: number;
-}> = ({ title, x, y }) => {
+}> = React.memo(({ title, x, y }) => {
   const size = 120;
   const radius = size / 2;
   // Translate coordinate from [-1, 1] to pixel offsets
@@ -37,7 +37,7 @@ const StickVisualizer: React.FC<{
         
         {/* Coordinate dot */}
         <div 
-          className="absolute h-4 w-4 bg-brand-cyan rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg shadow-brand-cyan/80 transition-all duration-75"
+          className="absolute h-4 w-4 bg-brand-cyan rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg shadow-brand-cyan/80"
           style={{ left: dotX, top: dotY }}
         />
       </div>
@@ -47,12 +47,12 @@ const StickVisualizer: React.FC<{
       </div>
     </div>
   );
-};
+});
 
 const TriggerBar: React.FC<{
   label: string;
   val: number;
-}> = ({ label, val }) => {
+}> = React.memo(({ label, val }) => {
   const percent = Math.round(val * 100);
   const filledBars = Math.round(val * 10);
   const emptyBars = 10 - filledBars;
@@ -66,13 +66,13 @@ const TriggerBar: React.FC<{
       </div>
       <div className="h-3 w-full bg-zinc-950 border border-zinc-900 rounded-lg overflow-hidden">
         <div 
-          className="h-full bg-brand-cyan transition-all duration-75 shadow-[0_0_8px_rgba(0,240,255,0.4)]" 
+          className="h-full bg-brand-cyan shadow-[0_0_8px_rgba(0,240,255,0.4)]" 
           style={{ width: `${percent}%` }}
         />
       </div>
     </div>
   );
-};
+});
 
 export const GamepadTesterPage: React.FC = () => {
   const { profile, updateProfile, vibrationIntensity, vibrationEnabled } = useApp();

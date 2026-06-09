@@ -13,7 +13,7 @@ interface ControllerSvgProps {
   triggerValues?: { lt: number; rt: number };
 }
 
-export const ControllerSvg: React.FC<ControllerSvgProps> = ({
+export const ControllerSvg: React.FC<ControllerSvgProps> = React.memo(({
   type,
   activePart = null,
   className = '',
@@ -283,16 +283,15 @@ export const ControllerSvg: React.FC<ControllerSvgProps> = ({
         <circle cx="0" cy="0" r="45" fill={getHeatmapColor('LeftStick', '#141417')} stroke="#2d2d38" strokeWidth="3" />
         <circle cx="0" cy="0" r="38" fill="#1a1a20" stroke="#3c3c4e" strokeWidth="1" />
         
-        <g 
-          transform={
-            leftStickCoords.x !== 0 || leftStickCoords.y !== 0
-              ? `translate(${leftStickCoords.x * 12}, ${leftStickCoords.y * 12})`
-              : activePart === 'left-stick'
-              ? 'translate(-8, -12)'
-              : 'translate(0, 0)'
-          }
-          className="transition-transform duration-75"
-        >
+          <g 
+            transform={
+              leftStickCoords.x !== 0 || leftStickCoords.y !== 0
+                ? `translate(${leftStickCoords.x * 12}, ${leftStickCoords.y * 12})`
+                : activePart === 'left-stick'
+                ? 'translate(-8, -12)'
+                : 'translate(0, 0)'
+            }
+          >
           <circle
             cx="0"
             cy="0"
@@ -311,16 +310,15 @@ export const ControllerSvg: React.FC<ControllerSvgProps> = ({
         <circle cx="0" cy="0" r="45" fill={getHeatmapColor('RightStick', '#141417')} stroke="#2d2d38" strokeWidth="3" />
         <circle cx="0" cy="0" r="38" fill="#1a1a20" stroke="#3c3c4e" strokeWidth="1" />
         
-        <g 
-          transform={
-            rightStickCoords.x !== 0 || rightStickCoords.y !== 0
-              ? `translate(${rightStickCoords.x * 12}, ${rightStickCoords.y * 12})`
-              : activePart === 'right-stick'
-              ? 'translate(12, 6)'
-              : 'translate(0, 0)'
-          }
-          className="transition-transform duration-75"
-        >
+          <g 
+            transform={
+              rightStickCoords.x !== 0 || rightStickCoords.y !== 0
+                ? `translate(${rightStickCoords.x * 12}, ${rightStickCoords.y * 12})`
+                : activePart === 'right-stick'
+                ? 'translate(12, 6)'
+                : 'translate(0, 0)'
+            }
+          >
           <circle
             cx="0"
             cy="0"
@@ -468,4 +466,4 @@ export const ControllerSvg: React.FC<ControllerSvgProps> = ({
       />
     </svg>
   );
-};
+});

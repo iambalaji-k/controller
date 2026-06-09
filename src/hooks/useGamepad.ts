@@ -49,6 +49,15 @@ const INITIAL_STATE: GamepadData = {
 export const useGamepad = (): GamepadData => {
   const [gamepadState, setGamepadState] = useState<GamepadData>(INITIAL_STATE);
   const animationRef = useRef<number | null>(null);
+  const previousStateRef = useRef<GamepadData | null>(null);
+
+  const axesEqual = (a: number[], b: number[]) =>
+    a.length === b.length && a.every((v, i) => v === b[i]);
+
+  const buttonsEqual = (a: Record<string, boolean>, b: Record<string, boolean>) => {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(k => a[k] === b[k]);
+  };
 
   const pollGamepad = () => {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -75,10 +84,6 @@ export const useGamepad = (): GamepadData => {
         }
       });
 
-      // Handle older/third-party D-pad mapping issues
-      // Some controllers map D-pad to axes (axes 9 or similar)
-      // Standard mapping maps D-pad to buttons 12-15. We'll default to standard buttons.
-      
       const newAxes = [
         activeGamepad.axes[0] || 0, // LS X
         activeGamepad.axes[1] || 0, // LS Y
@@ -86,15 +91,35 @@ export const useGamepad = (): GamepadData => {
         activeGamepad.axes[3] || 0, // RS Y
       ];
 
-      setGamepadState({
+      const mergedButtons = { ...INITIAL_STATE.buttons, ...mappedButtons };
+      const mergedValues = { ...INITIAL_STATE.buttonValues, ...mappedValues };
+
+      // Skip state update if nothing changed
+      const prev = previousStateRef.current;
+      if (
+        prev &&
+        prev.connected === true &&
+        axesEqual(prev.axes, newAxes) &&
+        buttonsEqual(prev.buttons, mergedButtons)
+      ) {
+        animationRef.current = requestAnimationFrame(pollGamepad);
+        return;
+      }
+
+      const newState: GamepadData = {
         connected: true,
         id: activeGamepad.id,
-        buttons: { ...INITIAL_STATE.buttons, ...mappedButtons },
-        buttonValues: { ...INITIAL_STATE.buttonValues, ...mappedValues },
+        buttons: mergedButtons,
+        buttonValues: mergedValues,
         axes: newAxes,
-      });
+      };
+      previousStateRef.current = newState;
+      setGamepadState(newState);
     } else {
-      setGamepadState(INITIAL_STATE);
+      if (previousStateRef.current?.connected !== false) {
+        previousStateRef.current = INITIAL_STATE;
+        setGamepadState(INITIAL_STATE);
+      }
     }
 
     // Loop polling at 60fps

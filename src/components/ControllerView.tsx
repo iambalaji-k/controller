@@ -17,7 +17,7 @@ interface ControllerViewProps {
   hidePanel?: boolean;
 }
 
-export const ControllerView: React.FC<ControllerViewProps> = ({ 
+export const ControllerView: React.FC<ControllerViewProps> = React.memo(({ 
   className = '',
   onButtonClick,
   highlightedButton = null,
@@ -35,7 +35,6 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
     Start: false, Back: false, Guide: false,
   });
   
-  const [showLabels, setShowLabels] = useState(true);
   const [pressedHistory, setPressedHistory] = useState<string[]>([]);
   
   // Track previous gamepad state for button press logging
@@ -249,36 +248,6 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
         </linearGradient>
       </defs>
 
-      {/* Blueprint HUD Lines */}
-      {showLabels && (
-        <g stroke="#8b5cf6" strokeWidth="1" opacity="0.3" strokeDasharray="3 3">
-          <path d="M120 40 L80 40 H30" />
-          <path d="M165 95 L100 80 H30" />
-          <path d="M180 170 L110 170 H30" />
-          <path d="M230 290 L120 290 H30" />
-          <path d="M480 40 L520 40 H570" />
-          <path d="M435 95 L500 80 H570" />
-          <path d="M420 125 L490 120 H570" />
-          <path d="M455 160 L510 175 H570" />
-          <path d="M380 270 L480 270 H570" />
-        </g>
-      )}
-
-      {/* Blueprint HUD Labels Text */}
-      {showLabels && (
-        <g fill="#9ca3af" fontSize="9" fontWeight="bold" fontFamily="var(--font-display)">
-          <text x="25" y="36" textAnchor="start">LT (LEFT TRIGGER)</text>
-          <text x="25" y="76" textAnchor="start">LB (LEFT BUMPER)</text>
-          <text x="25" y="166" textAnchor="start">LS (LEFT STICK / L3)</text>
-          <text x="25" y="286" textAnchor="start">D-PAD (DIRECTIONAL)</text>
-          <text x="575" y="36" textAnchor="end">RT (RIGHT TRIGGER)</text>
-          <text x="575" y="76" textAnchor="end">RB (RIGHT BUMPER)</text>
-          <text x="575" y="116" textAnchor="end">ACTION BUTTONS (Y/B/A/X)</text>
-          <text x="575" y="171" textAnchor="end">MELEE BUTTON (B)</text>
-          <text x="575" y="266" textAnchor="end">RS (RIGHT STICK / R3)</text>
-        </g>
-      )}
-
       {/* Shoulder triggers (LT / RT) */}
       <path
         d="M100 80 C95 40, 130 30, 150 45 L135 90 Z"
@@ -290,7 +259,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
         onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('LT'); }}
         onMouseDown={() => handleMousePress('LT')}
         onMouseUp={() => handleMouseRelease('LT')}
-        className="cursor-pointer transition-all duration-150"
+        className="cursor-pointer"
       />
       <path
         d="M500 80 C505 40, 470 30, 450 45 L465 90 Z"
@@ -302,7 +271,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
         onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('RT'); }}
         onMouseDown={() => handleMousePress('RT')}
         onMouseUp={() => handleMouseRelease('RT')}
-        className="cursor-pointer transition-all duration-150"
+        className="cursor-pointer"
       />
 
       {/* Shoulder Bumpers (LB / RB) */}
@@ -315,7 +284,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
         onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('LB'); }}
         onMouseDown={() => handleMousePress('LB')}
         onMouseUp={() => handleMouseRelease('LB')}
-        className="cursor-pointer transition-all duration-150"
+        className="cursor-pointer"
       />
       <path
         d="M490 95 C480 75, 420 75, 385 90 L390 105 C420 92, 470 92, 485 105 Z"
@@ -326,12 +295,12 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
         onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('RB'); }}
         onMouseDown={() => handleMousePress('RB')}
         onMouseUp={() => handleMouseRelease('RB')}
-        className="cursor-pointer transition-all duration-150"
+        className="cursor-pointer"
       />
 
       {/* Gamepad Main Controller Shell */}
       <path
-        d="M170 105 C240 95, 360 95, 430 105 C500 115, 560 160, 570 230 C585 315, 520 405, 475 405 C435 405, 410 350, 390 320 C340 300, 260 300, 210 320 C190 350, 160 405, 125 405 C80 405, 15 315, 30 230 C40 160, 100 115, 170 105 Z"
+        d="M170 105 C240 95, 360 95, 430 105 C500 115, 555 160, 565 225 C575 295, 530 370, 485 395 C440 420, 410 350, 385 320 C340 300, 260 300, 215 320 C190 350, 160 420, 115 395 C70 370, 25 295, 35 225 C45 160, 100 115, 170 105 Z"
         fill="url(#body-gradient)"
         stroke="#2d2d39"
         strokeWidth="4"
@@ -418,7 +387,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
       >
         <circle cx="0" cy="0" r="44" fill="#0f0f13" stroke={highlightedButton === 'LeftStick' || highlightedButton === 'L3' ? '#f59e0b' : '#2e2e38'} strokeWidth="3" />
         <circle cx="0" cy="0" r="36" fill="#181822" stroke="#3c3c4e" strokeWidth="1" />
-        <g transform={`translate(${lsOffset.x}, ${lsOffset.y}) ${isButtonActive('L3') ? 'scale(0.95)' : 'scale(1)'}`} className="transition-all duration-75">
+        <g transform={`translate(${lsOffset.x}, ${lsOffset.y}) ${isButtonActive('L3') ? 'scale(0.95)' : 'scale(1)'}`}>
           <circle
             cx="0"
             cy="0"
@@ -447,7 +416,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
       >
         <circle cx="0" cy="0" r="44" fill="#0f0f13" stroke={highlightedButton === 'RightStick' || highlightedButton === 'R3' ? '#f59e0b' : '#2e2e38'} strokeWidth="3" />
         <circle cx="0" cy="0" r="36" fill="#181822" stroke="#3c3c4e" strokeWidth="1" />
-        <g transform={`translate(${rsOffset.x}, ${rsOffset.y}) ${isButtonActive('R3') ? 'scale(0.95)' : 'scale(1)'}`} className="transition-all duration-75">
+        <g transform={`translate(${rsOffset.x}, ${rsOffset.y}) ${isButtonActive('R3') ? 'scale(0.95)' : 'scale(1)'}`}>
           <circle
             cx="0"
             cy="0"
@@ -465,58 +434,43 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
         </g>
       </g>
 
-      {/* Xbox 360 Circular D-PAD (Bottom Left) */}
+      {/* D-PAD (Bottom Left) — Clean Cross */}
       <g transform="translate(240, 275)">
         <circle cx="0" cy="0" r="40" fill="#181822" stroke={highlightedButton?.startsWith('Dpad') ? '#f59e0b' : '#2d2d38'} strokeWidth="3.5" />
-        <path
-          d="M -24 -24 L 0 0 L 24 -24 A 34 34 0 0 0 -24 -24 Z"
-          fill={getButtonColor('DpadUp')}
-          stroke="#373745"
-          strokeWidth="1.5"
+        <rect x="-12" y="-36" width="24" height="24" rx="3" fill={getButtonColor('DpadUp')} stroke="#373745" strokeWidth="1.5"
           onMouseEnter={() => setHoveredButton('DpadUp')}
           onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('DpadUp'); }}
           onMouseDown={() => handleMousePress('DpadUp')}
           onMouseUp={() => handleMouseRelease('DpadUp')}
           className="cursor-pointer transition-colors duration-150"
         />
-        <path
-          d="M 24 -24 L 0 0 L 24 24 A 34 34 0 0 0 24 -24 Z"
-          fill={getButtonColor('DpadRight')}
-          stroke="#373745"
-          strokeWidth="1.5"
+        <rect x="12" y="-12" width="24" height="24" rx="3" fill={getButtonColor('DpadRight')} stroke="#373745" strokeWidth="1.5"
           onMouseEnter={() => setHoveredButton('DpadRight')}
           onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('DpadRight'); }}
           onMouseDown={() => handleMousePress('DpadRight')}
           onMouseUp={() => handleMouseRelease('DpadRight')}
           className="cursor-pointer transition-colors duration-150"
         />
-        <path
-          d="M 24 24 L 0 0 L -24 24 A 34 34 0 0 0 24 24 Z"
-          fill={getButtonColor('DpadDown')}
-          stroke="#373745"
-          strokeWidth="1.5"
+        <rect x="-12" y="12" width="24" height="24" rx="3" fill={getButtonColor('DpadDown')} stroke="#373745" strokeWidth="1.5"
           onMouseEnter={() => setHoveredButton('DpadDown')}
           onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('DpadDown'); }}
           onMouseDown={() => handleMousePress('DpadDown')}
           onMouseUp={() => handleMouseRelease('DpadDown')}
           className="cursor-pointer transition-colors duration-150"
         />
-        <path
-          d="M -24 24 L 0 0 L -24 -24 A 34 34 0 0 0 -24 24 Z"
-          fill={getButtonColor('DpadLeft')}
-          stroke="#373745"
-          strokeWidth="1.5"
+        <rect x="-36" y="-12" width="24" height="24" rx="3" fill={getButtonColor('DpadLeft')} stroke="#373745" strokeWidth="1.5"
           onMouseEnter={() => setHoveredButton('DpadLeft')}
           onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('DpadLeft'); }}
           onMouseDown={() => handleMousePress('DpadLeft')}
           onMouseUp={() => handleMouseRelease('DpadLeft')}
           className="cursor-pointer transition-colors duration-150"
         />
-        <circle cx="0" cy="0" r="10" fill="#24242d" stroke="#2d2d38" strokeWidth="1" pointerEvents="none" />
-        <polygon points="0,-18 -4,-12 4,-12" fill="#888" pointerEvents="none" />
-        <polygon points="18,0 12,-4 12,4" fill="#888" pointerEvents="none" />
-        <polygon points="0,18 -4,12 4,12" fill="#888" pointerEvents="none" />
-        <polygon points="-18,0 -12,-4 -12,4" fill="#888" pointerEvents="none" />
+        <rect x="-12" y="-12" width="24" height="24" rx="3" fill="#24242d" stroke="#2d2d38" strokeWidth="1" pointerEvents="none" />
+        {/* Directional arrows */}
+        <polygon points="0,-24 -4,-18 4,-18" fill="#888" pointerEvents="none" />
+        <polygon points="24,0 18,-4 18,4" fill="#888" pointerEvents="none" />
+        <polygon points="0,24 -4,18 4,18" fill="#888" pointerEvents="none" />
+        <polygon points="-24,0 -18,-4 -18,4" fill="#888" pointerEvents="none" />
       </g>
 
       {/* Action Buttons: A, B, X, Y (Right Side) */}
@@ -624,19 +578,16 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
           <div className="flex items-center gap-2.5">
             <Activity className="h-5 w-5 text-brand-cyan animate-pulse" />
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-white font-display">
-              Xbox 360 Telemetry Calibration
+              Controller Diagnostics
             </h3>
           </div>
-          <button
-            onClick={() => setShowLabels((prev) => !prev)}
-            className={`px-3 py-1 rounded-lg border text-[9px] font-bold font-display uppercase tracking-wider transition-colors ${
-              showLabels
-                ? 'border-brand-purple text-brand-purple bg-brand-purple/5'
-                : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            {showLabels ? 'Hide Blueprint HUD' : 'Show Blueprint HUD'}
-          </button>
+          <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
+            gamepad.connected 
+              ? 'border-brand-green bg-brand-green/5 text-brand-green'
+              : 'border-red-500/20 bg-red-500/5 text-red-400'
+          }`}>
+            {gamepad.connected ? 'LIVE' : 'OFFLINE'}
+          </span>
         </div>
 
         {/* SVG Gamepad Frame */}
@@ -733,7 +684,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
                     <span className="text-brand-cyan">{(ltVal * 100).toFixed(0)}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-zinc-950 border border-zinc-900 rounded-full overflow-hidden">
-                    <div className="h-full bg-brand-cyan transition-all duration-75" style={{ width: `${ltVal * 100}%` }} />
+                    <div className="h-full bg-brand-cyan" style={{ width: `${ltVal * 100}%` }} />
                   </div>
                 </div>
 
@@ -744,7 +695,7 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
                     <span className="text-brand-cyan">{(rtVal * 100).toFixed(0)}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-zinc-950 border border-zinc-900 rounded-full overflow-hidden">
-                    <div className="h-full bg-brand-cyan transition-all duration-75" style={{ width: `${rtVal * 100}%` }} />
+                    <div className="h-full bg-brand-cyan" style={{ width: `${rtVal * 100}%` }} />
                   </div>
                 </div>
               </div>
@@ -788,4 +739,4 @@ export const ControllerView: React.FC<ControllerViewProps> = ({
 
     </div>
   );
-};
+});
