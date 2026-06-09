@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { ToastManager } from './components/ToastManager';
+import { SessionReviewModal } from './components/SessionReviewModal';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TrainingPage } from './pages/TrainingPage';
+import { GamepadTesterPage } from './pages/GamepadTesterPage';
 import { AchievementsPage } from './pages/AchievementsPage';
 import { ProfilePage } from './pages/ProfilePage';
 
 const AppContent: React.FC = () => {
   const [activePage, setActivePage] = useState<string>('landing');
+  const { shakeScreen } = useApp();
 
   // Render active page based on current routing state
   const renderPage = () => {
@@ -20,6 +23,8 @@ const AppContent: React.FC = () => {
         return <DashboardPage setActivePage={setActivePage} />;
       case 'training':
         return <TrainingPage />;
+      case 'gamepad':
+        return <GamepadTesterPage />;
       case 'achievements':
         return <AchievementsPage />;
       case 'profile':
@@ -30,7 +35,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100 selection:bg-brand-purple/30 selection:text-white">
+    <div className={`flex flex-col min-h-screen bg-zinc-950 text-zinc-100 selection:bg-brand-purple/30 selection:text-white ${shakeScreen ? 'animate-shake' : ''}`}>
       {/* Navigation Header & Sidebar / Bottom bar */}
       <Navbar activePage={activePage} setActivePage={setActivePage} />
 
@@ -46,9 +51,11 @@ const AppContent: React.FC = () => {
           {renderPage()}
         </div>
       </main>
-
       {/* Overlay global notifications */}
       <ToastManager />
+
+      {/* Session Review analytics popup */}
+      <SessionReviewModal />
     </div>
   );
 };

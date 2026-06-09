@@ -1,19 +1,37 @@
 import React from 'react';
 import type { ControllerType } from '../types';
+import { useApp } from '../context/AppContext';
 
 interface ControllerSvgProps {
   type: ControllerType;
   activePart?: 'left-stick' | 'right-stick' | 'dpad' | 'buttons' | 'triggers' | null;
   className?: string;
+  heatmapMode?: 'none' | 'mistakes' | 'speed' | 'practice';
+  pressedButtons?: Record<string, boolean>;
+  leftStickCoords?: { x: number; y: number };
+  rightStickCoords?: { x: number; y: number };
+  triggerValues?: { lt: number; rt: number };
 }
 
 export const ControllerSvg: React.FC<ControllerSvgProps> = ({
   type,
   activePart = null,
   className = '',
+  heatmapMode = 'none',
+  pressedButtons = {},
+  leftStickCoords = { x: 0, y: 0 },
+  rightStickCoords = { x: 0, y: 0 },
+  triggerValues = { lt: 0, rt: 0 },
 }) => {
-  // Theme colors based on controller type
+  const { profile, stats } = useApp();
+  const selectedSkin = profile.selectedSkin || 'standard';
+
+  // Base brand colors
   const getBrandColor = () => {
+    if (selectedSkin === 'carbon') return '#ff3b30'; // Sleek Red line accent
+    if (selectedSkin === 'gold') return '#fbbf24'; // Luxury Gold glow
+    if (selectedSkin === 'cyberpunk') return '#00f0ff'; // Cyberpunk Neon Cyan
+    
     switch (type) {
       case 'xbox': return '#10b981'; // Emerald Green
       case 'playstation': return '#3b82f6'; // PlayStation Blue
@@ -23,6 +41,73 @@ export const ControllerSvg: React.FC<ControllerSvgProps> = ({
   };
 
   const brandColor = getBrandColor();
+
+  // Helper function to color code heatmap buttons
+  const getHeatmapColor = (btn: string, defaultColor: string) => {
+    if (heatmapMode === 'none') return defaultColor;
+
+    if (heatmapMode === 'mistakes') {
+      const misses = stats.buttonMistakes?.[btn] || 0;
+      if (misses === 0) return '#1f2937'; // slate-800
+      if (misses < 3) return '#b91c1c'; // light red
+      return '#ef4444'; // glowing red
+    }
+
+    if (heatmapMode === 'speed') {
+      const speed = stats.buttonReactionTimes?.[btn] || 0;
+      if (speed === 0) return '#1f2937';
+      if (speed <= 210) return '#059669'; // fast green
+      if (speed <= 260) return '#d97706'; // intermediate orange
+      return '#dc2626'; // slow red
+    }
+
+    if (heatmapMode === 'practice') {
+      const count = stats.buttonPracticeCounts?.[btn] || 0;
+      if (count === 0) return '#1f2937';
+      if (count < 5) return '#6d28d9'; // light purple
+      if (count < 15) return '#8b5cf6'; // purple
+      return '#00f0ff'; // max cyan
+    }
+
+    return defaultColor;
+  };
+
+  // Helper function for active button highlights
+  const getButtonFill = (btn: string, defaultColor: string) => {
+    if (heatmapMode !== 'none') {
+      return getHeatmapColor(btn, defaultColor);
+    }
+    const isPressed = pressedButtons[btn] || false;
+    
+    if (selectedSkin === 'standard') {
+      if (btn === 'A') return isPressed ? '#10b981' : '#047857'; // Green
+      if (btn === 'B') return isPressed ? '#ef4444' : '#b91c1c'; // Red
+      if (btn === 'X') return isPressed ? '#3b82f6' : '#1d4ed8'; // Blue
+      if (btn === 'Y') return isPressed ? '#eab308' : '#a16207'; // Yellow
+    }
+
+    if (isPressed) {
+      return brandColor; // active skin highlight
+    }
+    return defaultColor;
+  };
+
+  const getButtonFillGeneral = (btn: string, defaultColor: string) => {
+    if (heatmapMode !== 'none') {
+      return getHeatmapColor(btn, defaultColor);
+    }
+    const isPressed = pressedButtons[btn] || false;
+    if (isPressed) {
+      return brandColor;
+    }
+    return defaultColor;
+  };
+
+  // Evaluate D-Pad colors
+  const isDpadUpActive = pressedButtons.DpadUp || activePart === 'dpad';
+  const isDpadDownActive = pressedButtons.DpadDown || activePart === 'dpad';
+  const isDpadLeftActive = pressedButtons.DpadLeft || activePart === 'dpad';
+  const isDpadRightActive = pressedButtons.DpadRight || activePart === 'dpad';
 
   return (
     <svg
@@ -41,12 +126,49 @@ export const ControllerSvg: React.FC<ControllerSvgProps> = ({
           <feGaussianBlur stdDeviation="8" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
-        {/* Gradients */}
-        <linearGradient id="controller-body" x1="300" y1="50" x2="300" y2="350" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#1e1e24" />
-          <stop offset="0.5" stopColor="#141418" />
-          <stop offset="1" stopColor="#0c0c0e" />
-        </linearGradient>
+        
+        {/* Carbon texture pattern */}
+        <pattern id="carbon-texture" width="8" height="8" patternUnits="userSpaceOnUse">
+          <rect width="8" height="8" fill="#131317" />
+          <polygon points="0,0 4,0 0,4" fill="#1c1c22" />
+          <polygon points="4,4 8,4 4,8" fill="#1c1c22" />
+          <polygon points="4,4 4,0 8,0" fill="#18181e" />
+          <polygon points="0,4 0,8 4,8" fill="#18181e" />
+        </pattern>
+
+        {/* Skins Body Gradients */}
+        {selectedSkin === 'standard' && (
+          <linearGradient id="controller-body" x1="300" y1="50" x2="300" y2="350" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#1c1c22" />
+            <stop offset="0.5" stopColor="#121215" />
+            <stop offset="1" stopColor="#08080a" />
+          </linearGradient>
+        )}
+
+        {selectedSkin === 'carbon' && (
+          <linearGradient id="controller-body" x1="300" y1="50" x2="300" y2="350" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#0d0d0f" />
+            <stop offset="0.5" stopColor="#15151b" />
+            <stop offset="1" stopColor="#050507" />
+          </linearGradient>
+        )}
+
+        {selectedSkin === 'gold' && (
+          <linearGradient id="controller-body" x1="300" y1="50" x2="300" y2="350" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#fbbf24" />
+            <stop offset="0.5" stopColor="#d97706" />
+            <stop offset="1" stopColor="#78350f" />
+          </linearGradient>
+        )}
+
+        {selectedSkin === 'cyberpunk' && (
+          <linearGradient id="controller-body" x1="300" y1="50" x2="300" y2="350" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#ff007f" />
+            <stop offset="0.5" stopColor="#8b5cf6" />
+            <stop offset="1" stopColor="#00f0ff" />
+          </linearGradient>
+        )}
+
         <linearGradient id="grip-left" x1="80" y1="180" x2="160" y2="320" gradientUnits="userSpaceOnUse">
           <stop stopColor="#2e2e38" />
           <stop offset="1" stopColor="#0d0d0f" />
@@ -61,255 +183,285 @@ export const ControllerSvg: React.FC<ControllerSvgProps> = ({
       <path
         d="M170 80 C240 70, 360 70, 430 80 C500 90, 550 140, 560 210 C570 280, 520 360, 480 360 C440 360, 410 320, 390 290 C340 270, 260 270, 210 290 C190 320, 160 360, 120 360 C80 360, 30 280, 40 210 C50 140, 100 90, 170 80 Z"
         stroke={brandColor}
-        strokeWidth="1.5"
-        strokeOpacity="0.25"
+        strokeWidth="2"
+        strokeOpacity="0.4"
+        filter="url(#glow-brand)"
       />
 
       {/* Main Body */}
       <path
         d="M170 80 C240 70, 360 70, 430 80 C500 90, 550 140, 560 210 C570 280, 520 360, 480 360 C440 360, 410 320, 390 290 C340 270, 260 270, 210 290 C190 320, 160 360, 120 360 C80 360, 30 280, 40 210 C50 140, 100 90, 170 80 Z"
         fill="url(#controller-body)"
-        stroke="#2d2d37"
-        strokeWidth="4"
+        stroke={selectedSkin === 'cyberpunk' ? '#00f0ff' : '#2d2d37'}
+        strokeWidth="3.5"
       />
+
+      {/* Carbon fiber overlay if selected */}
+      {selectedSkin === 'carbon' && (
+        <path
+          d="M170 80 C240 70, 360 70, 430 80 C500 90, 550 140, 560 210 C570 280, 520 360, 480 360 C440 360, 410 320, 390 290 C340 270, 260 270, 210 290 C190 320, 160 360, 120 360 C80 360, 30 280, 40 210 C50 140, 100 90, 170 80 Z"
+          fill="url(#carbon-texture)"
+          opacity="0.3"
+          pointerEvents="none"
+        />
+      )}
 
       {/* Left Grip Texture */}
       <path
         d="M45 200 C40 250, 60 310, 100 345 C115 355, 128 350, 125 330 C110 290, 95 240, 90 200 C90 190, 50 190, 45 200 Z"
         fill="url(#grip-left)"
-        opacity="0.8"
+        opacity="0.75"
       />
 
       {/* Right Grip Texture */}
       <path
         d="M555 200 C560 250, 540 310, 500 345 C485 355, 472 350, 475 330 C490 290, 505 240, 510 200 C510 190, 550 190, 555 200 Z"
         fill="url(#grip-right)"
-        opacity="0.8"
+        opacity="0.75"
       />
 
       {/* Logo/Center Area (Vents / Light bar) */}
       <g transform="translate(260, 85)">
-        {/* Stylized Logo housing */}
         <path d="M10 5 H70 L60 35 H20 Z" fill="#18181c" stroke="#2a2a35" strokeWidth="2" />
-        {/* Glow Bar */}
         <rect
           x="25"
           y="12"
           width="30"
           height="8"
           rx="4"
-          fill={brandColor}
-          filter={activePart ? 'url(#glow-brand)' : 'none'}
-          className="transition-all duration-300"
-          style={{ fill: brandColor }}
+          fill={getButtonFillGeneral('Guide', brandColor)}
+          filter={pressedButtons.Guide ? "url(#glow-brand)" : undefined}
+          className="transition-all duration-75"
         />
-        {/* Tiny vents */}
-        <line x1="20" y1="28" x2="60" y2="28" stroke="#3a3a4c" strokeWidth="2" strokeDasharray="4 3" />
       </g>
 
-      {/* Bumpers & Triggers (Rear top indicators) */}
-      {/* Left Trigger (LT/L2) */}
-      <g transform="translate(90, 30)" className="transition-all duration-300">
+      {/* Bumpers & Triggers */}
+      {/* Left Trigger (LT) */}
+      <g transform="translate(90, 30)">
         <path
           d="M10 35 C15 5, 60 5, 80 20 L70 45 C55 35, 25 35, 20 45 Z"
-          fill={activePart === 'triggers' ? brandColor : '#1f1f26'}
-          stroke={activePart === 'triggers' ? brandColor : '#3f3f4f'}
+          fill={triggerValues.lt > 0 ? brandColor : getButtonFillGeneral('LT', activePart === 'triggers' ? brandColor : '#1f1f26')}
+          fillOpacity={triggerValues.lt > 0 ? 0.3 + triggerValues.lt * 0.7 : 1}
+          stroke={activePart === 'triggers' || triggerValues.lt > 0 ? brandColor : '#3f3f4f'}
           strokeWidth="2"
-          filter={activePart === 'triggers' ? 'url(#glow-brand)' : 'none'}
         />
-        <text x="35" y="25" fill={activePart === 'triggers' ? '#fff' : '#6b7280'} fontSize="11" fontWeight="bold" fontFamily="monospace">L2</text>
+        <text x="35" y="25" fill="#fff" fontSize="11" fontWeight="bold" fontFamily="monospace">LT</text>
       </g>
       
-      {/* Right Trigger (RT/R2) */}
-      <g transform="translate(430, 30)" className="transition-all duration-300">
+      {/* Right Trigger (RT) */}
+      <g transform="translate(430, 30)">
         <path
           d="M90 35 C85 5, 40 5, 20 20 L30 45 C45 35, 75 35, 80 45 Z"
-          fill={activePart === 'triggers' ? brandColor : '#1f1f26'}
-          stroke={activePart === 'triggers' ? brandColor : '#3f3f4f'}
+          fill={triggerValues.rt > 0 ? brandColor : getButtonFillGeneral('RT', activePart === 'triggers' ? brandColor : '#1f1f26')}
+          fillOpacity={triggerValues.rt > 0 ? 0.3 + triggerValues.rt * 0.7 : 1}
+          stroke={activePart === 'triggers' || triggerValues.rt > 0 ? brandColor : '#3f3f4f'}
           strokeWidth="2"
-          filter={activePart === 'triggers' ? 'url(#glow-brand)' : 'none'}
         />
-        <text x="50" y="25" fill={activePart === 'triggers' ? '#fff' : '#6b7280'} fontSize="11" fontWeight="bold" fontFamily="monospace">R2</text>
+        <text x="50" y="25" fill="#fff" fontSize="11" fontWeight="bold" fontFamily="monospace">RT</text>
       </g>
 
-      {/* Left Bumper (LB/L1) */}
+      {/* Left Bumper (LB) */}
       <path
         d="M110 65 C130 50, 190 50, 220 58 L215 72 C190 65, 140 65, 120 75 Z"
-        fill={activePart === 'triggers' ? brandColor : '#2b2b35'}
-        stroke="#3f3f50"
+        fill={getButtonFillGeneral('LB', activePart === 'triggers' ? brandColor : '#2b2b35')}
+        stroke={pressedButtons.LB ? brandColor : '#3f3f50'}
         strokeWidth="1.5"
-        className="transition-all duration-300"
       />
 
-      {/* Right Bumper (RB/R1) */}
+      {/* Right Bumper (RB) */}
       <path
         d="M490 65 C470 50, 410 50, 380 58 L385 72 C410 65, 460 65, 480 75 Z"
-        fill={activePart === 'triggers' ? brandColor : '#2b2b35'}
-        stroke="#3f3f50"
+        fill={getButtonFillGeneral('RB', activePart === 'triggers' ? brandColor : '#2b2b35')}
+        stroke={pressedButtons.RB ? brandColor : '#3f3f50'}
         strokeWidth="1.5"
-        className="transition-all duration-300"
       />
 
-      {/* Left Analog Stick - Xbox layout (top-left) vs PS layout (bottom-left) */}
-      {/* Xbox Layout: Left Stick is Top Left, D-Pad is Bottom Left */}
-      {/* PlayStation Layout: Both sticks are at bottom-center */}
+      {/* Left Analog Stick */}
       <g
         transform={type === 'xbox' || type === 'switch' ? 'translate(160, 160)' : 'translate(220, 240)'}
-        className="transition-all duration-300"
       >
-        <circle cx="0" cy="0" r="45" fill="#141417" stroke="#2d2d38" strokeWidth="3" />
+        <circle cx="0" cy="0" r="45" fill={getHeatmapColor('LeftStick', '#141417')} stroke="#2d2d38" strokeWidth="3" />
         <circle cx="0" cy="0" r="38" fill="#1a1a20" stroke="#3c3c4e" strokeWidth="1" />
         
-        {/* Animated Inner Thumbstick */}
-        <g transform={activePart === 'left-stick' ? 'translate(-8, -12)' : 'translate(0, 0)'} className="transition-all duration-300">
+        <g 
+          transform={
+            leftStickCoords.x !== 0 || leftStickCoords.y !== 0
+              ? `translate(${leftStickCoords.x * 12}, ${leftStickCoords.y * 12})`
+              : activePart === 'left-stick'
+              ? 'translate(-8, -12)'
+              : 'translate(0, 0)'
+          }
+          className="transition-transform duration-75"
+        >
           <circle
             cx="0"
             cy="0"
             r="30"
-            fill="#262630"
-            stroke={activePart === 'left-stick' ? brandColor : '#4b5563'}
+            fill={getButtonFillGeneral('L3', '#262630')}
+            stroke={activePart === 'left-stick' || pressedButtons.L3 ? brandColor : '#4b5563'}
             strokeWidth="3.5"
-            filter={activePart === 'left-stick' ? 'url(#glow-brand)' : 'none'}
           />
-          {/* Thumb grip textures */}
-          <line x1="-8" y1="0" x2="8" y2="0" stroke={activePart === 'left-stick' ? brandColor : '#555'} strokeWidth="2.5" />
-          <line x1="0" y1="-8" x2="0" y2="8" stroke={activePart === 'left-stick' ? brandColor : '#555'} strokeWidth="2.5" />
-          <circle cx="0" cy="0" r="16" fill="none" stroke={activePart === 'left-stick' ? brandColor : '#3c3c4e'} strokeWidth="1.5" strokeDasharray="3 3" />
+          <line x1="-8" y1="0" x2="8" y2="0" stroke="#555" strokeWidth="2.5" />
+          <line x1="0" y1="-8" x2="0" y2="8" stroke="#555" strokeWidth="2.5" />
         </g>
       </g>
 
-      {/* Right Analog Stick (Always Bottom Right) */}
-      <g transform="translate(380, 240)" className="transition-all duration-300">
-        <circle cx="0" cy="0" r="45" fill="#141417" stroke="#2d2d38" strokeWidth="3" />
+      {/* Right Analog Stick */}
+      <g transform="translate(380, 240)">
+        <circle cx="0" cy="0" r="45" fill={getHeatmapColor('RightStick', '#141417')} stroke="#2d2d38" strokeWidth="3" />
         <circle cx="0" cy="0" r="38" fill="#1a1a20" stroke="#3c3c4e" strokeWidth="1" />
         
-        {/* Animated Inner Thumbstick */}
-        <g transform={activePart === 'right-stick' ? 'translate(12, 6)' : 'translate(0, 0)'} className="transition-all duration-300">
+        <g 
+          transform={
+            rightStickCoords.x !== 0 || rightStickCoords.y !== 0
+              ? `translate(${rightStickCoords.x * 12}, ${rightStickCoords.y * 12})`
+              : activePart === 'right-stick'
+              ? 'translate(12, 6)'
+              : 'translate(0, 0)'
+          }
+          className="transition-transform duration-75"
+        >
           <circle
             cx="0"
             cy="0"
             r="30"
-            fill="#262630"
-            stroke={activePart === 'right-stick' ? brandColor : '#4b5563'}
+            fill={getButtonFillGeneral('R3', '#262630')}
+            stroke={activePart === 'right-stick' || pressedButtons.R3 ? brandColor : '#4b5563'}
             strokeWidth="3.5"
-            filter={activePart === 'right-stick' ? 'url(#glow-brand)' : 'none'}
           />
-          {/* Thumb grip textures */}
-          <line x1="-8" y1="0" x2="8" y2="0" stroke={activePart === 'right-stick' ? brandColor : '#555'} strokeWidth="2.5" />
-          <line x1="0" y1="-8" x2="0" y2="8" stroke={activePart === 'right-stick' ? brandColor : '#555'} strokeWidth="2.5" />
-          <circle cx="0" cy="0" r="16" fill="none" stroke={activePart === 'right-stick' ? brandColor : '#3c3c4e'} strokeWidth="1.5" strokeDasharray="3 3" />
+          <line x1="-8" y1="0" x2="8" y2="0" stroke="#555" strokeWidth="2.5" />
+          <line x1="0" y1="-8" x2="0" y2="8" stroke="#555" strokeWidth="2.5" />
         </g>
       </g>
 
       {/* D-PAD */}
-      {/* Xbox Layout: D-Pad is Bottom Left (220, 240) */}
-      {/* PS Layout: D-Pad is Top Left (160, 160) */}
       <g
         transform={type === 'xbox' || type === 'switch' ? 'translate(220, 240)' : 'translate(160, 160)'}
-        className="transition-all duration-300"
       >
-        {/* Dpad Backing Circle */}
         <circle cx="0" cy="0" r="40" fill="#18181f" stroke="#2d2d38" strokeWidth="2" />
         
-        {/* Cross Path */}
+        {/* D-Pad background shape */}
         <path
           d="M-12 -34 H12 V-12 H34 V12 H12 V34 H-12 V12 H-34 V-12 H-12 Z"
-          fill={activePart === 'dpad' ? brandColor : '#24242d'}
+          fill="#24242d"
           stroke="#4b5563"
           strokeWidth="2"
-          filter={activePart === 'dpad' ? 'url(#glow-brand)' : 'none'}
-          className="transition-all duration-300"
         />
-        {/* Accent lines */}
-        <path d="M0 -30 L0 -15" stroke={activePart === 'dpad' ? '#fff' : '#6b7280'} strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M0 30 L0 15" stroke={activePart === 'dpad' ? '#fff' : '#6b7280'} strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M-30 0 L-15 0" stroke={activePart === 'dpad' ? '#fff' : '#6b7280'} strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M30 0 L15 0" stroke={activePart === 'dpad' ? '#fff' : '#6b7280'} strokeWidth="2.5" strokeLinecap="round" />
+
+        {/* Up direction highlight */}
+        <path
+          d="M-12 -34 H12 V-12 H-12 Z"
+          fill={isDpadUpActive ? getButtonFillGeneral('DpadUp', brandColor) : 'transparent'}
+        />
+        {/* Down direction highlight */}
+        <path
+          d="M-12 12 H12 V34 H-12 Z"
+          fill={isDpadDownActive ? getButtonFillGeneral('DpadDown', brandColor) : 'transparent'}
+        />
+        {/* Left direction highlight */}
+        <path
+          d="M-34 -12 H-12 V12 H-34 Z"
+          fill={isDpadLeftActive ? getButtonFillGeneral('DpadLeft', brandColor) : 'transparent'}
+        />
+        {/* Right direction highlight */}
+        <path
+          d="M12 -12 H34 V12 H12 Z"
+          fill={isDpadRightActive ? getButtonFillGeneral('DpadRight', brandColor) : 'transparent'}
+        />
+
+        {/* Re-render grid lines and indicators for high contrast */}
+        <path
+          d="M-12 -34 H12 V-12 H34 V12 H12 V34 H-12 V12 H-34 V-12 H-12 Z"
+          fill="none"
+          stroke="#4b5563"
+          strokeWidth="2"
+        />
+        <path d="M0 -30 L0 -15" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M0 30 L0 15" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M-30 0 L-15 0" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M30 0 L15 0" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
       </g>
 
-      {/* Face Buttons Area (X, Y, A, B or Triangle, Circle, Cross, Square) */}
+      {/* Face Buttons Area */}
       <g transform="translate(440, 160)">
         <circle cx="0" cy="0" r="45" fill="#16161d" opacity="0.3" />
         
-        {/* Button North (Y or Triangle) */}
-        <g transform="translate(0, -28)" className="transition-all duration-200">
+        {/* Button North (Y) */}
+        <g transform="translate(0, -28)">
           <circle
             cx="0"
             cy="0"
             r="13"
-            fill={activePart === 'buttons' ? brandColor : '#22222a'}
-            stroke="#4b5563"
+            fill={getButtonFill('Y', '#22222a')}
+            stroke={pressedButtons.Y ? brandColor : '#4b5563'}
             strokeWidth="1.5"
-            filter={activePart === 'buttons' ? 'url(#glow-brand)' : 'none'}
+            className="transition-all duration-75"
           />
-          <text x="0" y="4.5" textAnchor="middle" fill={activePart === 'buttons' ? '#fff' : '#a1a1aa'} fontSize="13" fontWeight="bold" fontFamily="monospace">
+          <text x="0" y="4.5" textAnchor="middle" fill="#fff" fontSize="13" fontWeight="bold" fontFamily="monospace">
             {type === 'playstation' ? '▲' : 'Y'}
           </text>
         </g>
         
-        {/* Button East (B or Circle) */}
-        <g transform="translate(28, 0)" className="transition-all duration-200">
+        {/* Button East (B) */}
+        <g transform="translate(28, 0)">
           <circle
             cx="0"
             cy="0"
             r="13"
-            fill={activePart === 'buttons' ? brandColor : '#22222a'}
-            stroke="#4b5563"
+            fill={getButtonFill('B', '#22222a')}
+            stroke={pressedButtons.B ? brandColor : '#4b5563'}
             strokeWidth="1.5"
-            filter={activePart === 'buttons' ? 'url(#glow-brand)' : 'none'}
+            className="transition-all duration-75"
           />
-          <text x="0" y="4.5" textAnchor="middle" fill={activePart === 'buttons' ? '#fff' : '#a1a1aa'} fontSize="13" fontWeight="bold" fontFamily="monospace">
+          <text x="0" y="4.5" textAnchor="middle" fill="#fff" fontSize="13" fontWeight="bold" fontFamily="monospace">
             {type === 'playstation' ? '●' : 'B'}
           </text>
         </g>
 
-        {/* Button South (A or Cross) */}
-        <g transform="translate(0, 28)" className="transition-all duration-200">
+        {/* Button South (A) */}
+        <g transform="translate(0, 28)">
           <circle
             cx="0"
             cy="0"
             r="13"
-            fill={activePart === 'buttons' ? brandColor : '#22222a'}
-            stroke="#4b5563"
+            fill={getButtonFill('A', '#22222a')}
+            stroke={pressedButtons.A ? brandColor : '#4b5563'}
             strokeWidth="1.5"
-            filter={activePart === 'buttons' ? 'url(#glow-brand)' : 'none'}
+            className="transition-all duration-75"
           />
-          <text x="0" y="4" textAnchor="middle" fill={activePart === 'buttons' ? '#fff' : '#a1a1aa'} fontSize="13" fontWeight="bold" fontFamily="monospace">
+          <text x="0" y="4" textAnchor="middle" fill="#fff" fontSize="13" fontWeight="bold" fontFamily="monospace">
             {type === 'playstation' ? '✖' : 'A'}
           </text>
         </g>
 
-        {/* Button West (X or Square) */}
-        <g transform="translate(-28, 0)" className="transition-all duration-200">
+        {/* Button West (X) */}
+        <g transform="translate(-28, 0)">
           <circle
             cx="0"
             cy="0"
             r="13"
-            fill={activePart === 'buttons' ? brandColor : '#22222a'}
-            stroke="#4b5563"
+            fill={getButtonFill('X', '#22222a')}
+            stroke={pressedButtons.X ? brandColor : '#4b5563'}
             strokeWidth="1.5"
-            filter={activePart === 'buttons' ? 'url(#glow-brand)' : 'none'}
+            className="transition-all duration-75"
           />
-          <text x="0" y="4.5" textAnchor="middle" fill={activePart === 'buttons' ? '#fff' : '#a1a1aa'} fontSize="12" fontWeight="bold" fontFamily="monospace">
+          <text x="0" y="4.5" textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold" fontFamily="monospace">
             {type === 'playstation' ? '■' : 'X'}
           </text>
         </g>
       </g>
 
       {/* Menu / Options buttons */}
-      {/* Options Left */}
       <path
         d="M235 155 L245 145"
-        stroke="#4b5563"
+        stroke={getButtonFillGeneral('Back', '#4b5563')}
         strokeWidth="3.5"
         strokeLinecap="round"
         fill="none"
       />
-      
-      {/* Options Right */}
       <path
         d="M365 155 L355 145"
-        stroke="#4b5563"
+        stroke={getButtonFillGeneral('Start', '#4b5563')}
         strokeWidth="3.5"
         strokeLinecap="round"
         fill="none"

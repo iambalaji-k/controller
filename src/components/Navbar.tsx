@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { LayoutDashboard, Target, User, Trophy, LogOut, Shield } from 'lucide-react';
+import { LayoutDashboard, Target, User, Trophy, LogOut, Shield, Gamepad2 } from 'lucide-react';
 
 interface NavbarProps {
   activePage: string;
@@ -14,6 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, setActivePage }) => 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'training', label: 'Training Drills', icon: Target },
+    { id: 'gamepad', label: 'Gamepad Tester', icon: Gamepad2 },
     { id: 'achievements', label: 'Achievements', icon: Trophy },
     { id: 'profile', label: 'Operative Profile', icon: User },
   ];

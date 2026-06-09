@@ -2,8 +2,8 @@ import type { Achievement } from '../types';
 
 export const DEFAULT_ACHIEVEMENTS: Achievement[] = [
   {
-    id: 'first_steps',
-    title: 'First Steps',
+    id: 'first_press',
+    title: 'First Press',
     description: 'Complete your first controller practice session.',
     category: 'general',
     xpReward: 100,
@@ -13,43 +13,65 @@ export const DEFAULT_ACHIEVEMENTS: Achievement[] = [
     icon: 'Play'
   },
   {
-    id: 'accuracy_pro',
-    title: 'Precision Marksman',
-    description: 'Achieve an average accuracy of 92% or higher.',
+    id: 'button_scholar',
+    title: 'Button Scholar',
+    description: 'Achieve an accuracy of 95% or higher in recognition drills.',
     category: 'precision',
-    xpReward: 250,
+    xpReward: 200,
     maxProgress: 1,
     currentProgress: 0,
     isUnlocked: false,
     icon: 'Target'
   },
   {
-    id: 'speed_demon',
-    title: 'Reflex Master',
-    description: 'Reach a reaction time of 180ms or lower.',
-    category: 'speed',
+    id: 'trigger_master',
+    title: 'Trigger Master',
+    description: 'Perform trigger alternating calibration with 90%+ accuracy.',
+    category: 'precision',
     xpReward: 250,
+    maxProgress: 1,
+    currentProgress: 0,
+    isUnlocked: false,
+    icon: 'Shield'
+  },
+  {
+    id: 'combo_apprentice',
+    title: 'Combo Apprentice',
+    description: 'Successfully complete 5 controller combos in sequence.',
+    category: 'mastery',
+    xpReward: 300,
+    maxProgress: 5,
+    currentProgress: 0,
+    isUnlocked: false,
+    icon: 'Crown'
+  },
+  {
+    id: 'reflex_ninja',
+    title: 'Reflex Ninja',
+    description: 'Reach a reaction speed of 180ms or lower in timed reflex drills.',
+    category: 'speed',
+    xpReward: 300,
     maxProgress: 1,
     currentProgress: 0,
     isUnlocked: false,
     icon: 'Zap'
   },
   {
-    id: 'consistency_king',
-    title: 'Dedicated Grind',
-    description: 'Build a practice streak of 3 consecutive days.',
-    category: 'general',
+    id: 'blind_warrior',
+    title: 'Blind Warrior',
+    description: 'Complete any blind memory drill with 90%+ accuracy.',
+    category: 'mastery',
     xpReward: 400,
-    maxProgress: 3,
+    maxProgress: 1,
     currentProgress: 0,
     isUnlocked: false,
-    icon: 'Flame'
+    icon: 'EyeOff'
   },
   {
-    id: 'drill_master',
-    title: 'Challenger',
-    description: 'Complete a total of 15 practice drills.',
-    category: 'mastery',
+    id: 'controller_veteran',
+    title: 'Controller Veteran',
+    description: 'Complete 15 total controller drills.',
+    category: 'general',
     xpReward: 500,
     maxProgress: 15,
     currentProgress: 0,
@@ -57,14 +79,14 @@ export const DEFAULT_ACHIEVEMENTS: Achievement[] = [
     icon: 'Trophy'
   },
   {
-    id: 'legendary_aim',
-    title: 'Controller Virtuoso',
-    description: 'Complete 5 Advanced or Expert level drills.',
+    id: 'muscle_memory_master',
+    title: 'Muscle Memory Master',
+    description: 'Develop stable muscle memory by reaching Operative Rank Level 5.',
     category: 'mastery',
-    xpReward: 750,
+    xpReward: 600,
     maxProgress: 5,
-    currentProgress: 0,
+    currentProgress: 1,
     isUnlocked: false,
-    icon: 'Crown'
+    icon: 'Award'
   }
 ];

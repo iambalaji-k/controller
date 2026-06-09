@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", sans-serif;
-  --font-display: "Outfit", sans-serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-display: "Orbitron", sans-serif;
+  --font-mono: "Share Tech Mono", monospace;
 
   --color-brand-cyan: #00f0ff;
   --color-brand-purple: #8b5cf6;
@@ -98,4 +99,50 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(-3px, 1px) rotate(-0.2deg); }
+  40% { transform: translate(2px, -1px) rotate(0.2deg); }
+  60% { transform: translate(-2px, 2px) rotate(0deg); }
+  80% { transform: translate(3px, 1px) rotate(0.2deg); }
+}
+
+.animate-shake {
+  animation: shake 0.15s ease-in-out infinite;
+}
+
+/* Accessibility overrides */
+html.large-text {
+  font-size: 112.5%;
+}
+html.large-text h1 {
+  font-size: 2rem !important;
+}
+html.large-text h2 {
+  font-size: 1.4rem !important;
+}
+html.large-text p, html.large-text span, html.large-text button {
+  font-size: 1.05rem !important;
+}
+
+html.reduced-motion *,
+html.reduced-motion *::before,
+html.reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.colorblind {
+  --color-brand-cyan: #3b82f6;
+  --color-brand-purple: #f59e0b;
+  --color-brand-magenta: #ffffff;
+  --color-brand-green: #3b82f6;
+}
+html.colorblind text {
+  fill: #ffffff !important;
+  font-weight: 900 !important;
 }

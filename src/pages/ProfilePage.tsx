@@ -1,10 +1,26 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import type { ControllerType } from '../types';
-import { User, Gamepad2, Database, Save, Award, BadgeAlert } from 'lucide-react';
+import { User, Gamepad2, Database, Save, Award, BadgeAlert, Activity, Eye } from 'lucide-react';
+import { checkVibrationSupport } from '../utils/vibration';
 
 export const ProfilePage: React.FC = () => {
-  const { profile, updateProfile, resetProgress } = useApp();
+  const { 
+    profile, 
+    updateProfile, 
+    resetProgress,
+    vibrationEnabled,
+    vibrationIntensity,
+    setVibrationEnabled,
+    setVibrationIntensity,
+    triggerHaptic,
+    colorblindMode,
+    largeTextMode,
+    reducedMotion,
+    setColorblindMode,
+    setLargeTextMode,
+    setReducedMotion
+  } = useApp();
 
   const [username, setUsername] = useState(profile.username);
   const [controllerType, setControllerType] = useState<ControllerType>(profile.controllerType);
@@ -216,6 +232,178 @@ export const ProfilePage: React.FC = () => {
                   )}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Haptics Calibration & Test Panel */}
+          <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-6">
+            <div className="flex items-center gap-2 border-b border-zinc-900 pb-3">
+              <Activity className="h-5 w-5 text-brand-purple" />
+              <h2 className="text-sm font-bold font-display uppercase tracking-wider text-white">
+                Haptics Calibration
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              {/* Actuator Status */}
+              <div className="flex items-center justify-between text-[10px] font-bold font-display uppercase tracking-wider">
+                <span className="text-zinc-500">Gamepad Actuator</span>
+                <span className={`px-2 py-0.5 rounded border ${
+                  checkVibrationSupport()
+                    ? 'border-brand-green bg-brand-green/5 text-brand-green'
+                    : 'border-yellow-500/20 bg-yellow-500/5 text-yellow-500'
+                }`}>
+                  {checkVibrationSupport() ? 'SUPPORTED' : 'UNSUPPORTED (FALLBACK SHAKE)'}
+                </span>
+              </div>
+
+              {/* Toggle Enable */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-bold text-zinc-300 font-display uppercase">Vibration Feedback</span>
+                  <span className="text-[9px] text-zinc-500">Enable physical rumble impulses</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVibrationEnabled(!vibrationEnabled)}
+                  className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    vibrationEnabled ? 'bg-brand-purple' : 'bg-zinc-800'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      vibrationEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Slider Intensity */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[10px] font-bold font-display uppercase tracking-wider">
+                  <span className="text-zinc-400">Rumble Intensity</span>
+                  <span className="text-brand-purple">{Math.round(vibrationIntensity * 100)}%</span>
+                </div>
+                <input
+                  type="range" min="10" max="100" step="5"
+                  value={Math.round(vibrationIntensity * 100)}
+                  onChange={(e) => setVibrationIntensity(Number(e.target.value) / 100)}
+                  className="w-full accent-brand-purple bg-zinc-900 rounded-lg appearance-none h-1.5"
+                  disabled={!vibrationEnabled}
+                />
+              </div>
+
+              {/* Pattern Test Grid */}
+              <div className="space-y-2 pt-2 border-t border-zinc-900/60">
+                <span className="block text-[9px] uppercase font-bold text-zinc-500 tracking-wider font-display">Test Haptic Signals</span>
+                <div className="grid grid-cols-2 gap-1.5 text-[9px] font-bold font-display uppercase tracking-wider">
+                  <button
+                    type="button"
+                    onClick={() => triggerHaptic('correct')}
+                    className="p-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 rounded-xl text-center text-zinc-300 transition-colors"
+                  >
+                    Correct Input
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerHaptic('incorrect')}
+                    className="p-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 rounded-xl text-center text-zinc-300 transition-colors"
+                  >
+                    Incorrect Input
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerHaptic('combo')}
+                    className="p-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 rounded-xl text-center text-zinc-300 transition-colors"
+                  >
+                    Combo Finish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerHaptic('levelup')}
+                    className="p-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 rounded-xl text-center text-zinc-300 transition-colors col-span-2"
+                  >
+                    Level Promotion
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Accessibility Options Panel */}
+          <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-6">
+            <div className="flex items-center gap-2 border-b border-zinc-900 pb-3">
+              <Eye className="h-5 w-5 text-brand-purple" />
+              <h2 className="text-sm font-bold font-display uppercase tracking-wider text-white">
+                Accessibility Options
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              {/* Colorblind Mode */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-bold text-zinc-300 font-display uppercase">Colorblind Mode</span>
+                  <span className="text-[9px] text-zinc-500">Apply high-contrast color overlays</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setColorblindMode(!colorblindMode)}
+                  className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    colorblindMode ? 'bg-brand-purple' : 'bg-zinc-800'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      colorblindMode ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Large Text Mode */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-bold text-zinc-300 font-display uppercase">Large Text Mode</span>
+                  <span className="text-[9px] text-zinc-500">Increase global interface typography scale</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLargeTextMode(!largeTextMode)}
+                  className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    largeTextMode ? 'bg-brand-purple' : 'bg-zinc-800'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      largeTextMode ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Reduced Motion Mode */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-bold text-zinc-300 font-display uppercase">Reduced Motion</span>
+                  <span className="text-[9px] text-zinc-500">Minimize animations and flashes</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReducedMotion(!reducedMotion)}
+                  className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    reducedMotion ? 'bg-brand-purple' : 'bg-zinc-800'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      reducedMotion ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
             </div>
           </div>
 

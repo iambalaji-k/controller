@@ -1,4 +1,5 @@
 export type ControllerType = 'xbox' | 'playstation' | 'switch';
+export type ControllerSkin = 'standard' | 'carbon' | 'gold' | 'cyberpunk';
 
 export interface UserProfile {
   username: string;
@@ -8,6 +9,12 @@ export interface UserProfile {
   level: number;
   xp: number;
   xpNeeded: number;
+  selectedSkin?: ControllerSkin;
+  skinsUnlocked?: ControllerSkin[];
+  learningPathLevel?: number; // 1 to 10 guided path
+  curriculumDay?: number; // 1 to 14 day KB/M transition curriculum
+  curriculumProgress?: Record<number, boolean>;
+  certifications?: Record<string, string>; // e.g. { 'batman': 'A', 'elden_ring': 'S' }
 }
 
 export interface StatHistoryEntry {
@@ -15,6 +22,13 @@ export interface StatHistoryEntry {
   xpGained: number;
   accuracy: number;
   reactionTime: number; // in ms
+}
+
+export interface SpacedRepetitionItem {
+  level: number; // 0 to 5 review stages
+  lastReviewed: string; // ISO date string
+  nextReviewDate: string; // ISO date string
+  mastered: boolean;
 }
 
 export interface GameStats {
@@ -26,6 +40,12 @@ export interface GameStats {
   totalPlaytime: number; // in minutes
   drillsCompleted: number;
   history: StatHistoryEntry[];
+  fastestReactionTime?: number;
+  buttonMastery?: Record<string, number>; // 0-100 mastery rating per button
+  buttonMistakes?: Record<string, number>; // mistake counts per button
+  buttonPracticeCounts?: Record<string, number>; // practice taps count per button
+  buttonReactionTimes?: Record<string, number>; // average reaction speed in ms per button
+  spacedRepetition?: Record<string, SpacedRepetitionItem>;
 }
 
 export interface Achievement {
@@ -60,3 +80,4 @@ export interface DrillCategory {
   drills: Drill[];
   isLocked: boolean;
 }
+
