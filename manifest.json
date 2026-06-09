@@ -2,7 +2,7 @@
   "name": "Controller Mastery",
   "short_name": "CtrlMastery",
   "description": "Level up your game controller mechanics, accuracy, and muscle memory with interactive gaming training guides.",
-  "start_url": "/",
+  "start_url": "/controller/",
   "display": "standalone",
   "background_color": "#09090b",
   "theme_color": "#8b5cf6",
@@ -10,7 +10,7 @@
   "categories": ["games", "utilities"],
   "icons": [
     {
-      "src": "vite.svg",
+      "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
