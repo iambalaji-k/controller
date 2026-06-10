@@ -79,7 +79,13 @@ export const useGamepad = (): GamepadData => {
       activeGamepad.buttons.forEach((btn, index) => {
         const key = BUTTON_MAPPING[index];
         if (key) {
-          mappedButtons[key] = btn.pressed;
+          // Fallback check: btn.pressed is sometimes false even if the value is > 0.
+          // For analog triggers (LT, RT), we check if value is greater than a small threshold (0.15).
+          // For all other buttons (bumpers, face buttons, dpad, etc.), we check if value > 0.5.
+          const isPressed = btn.pressed || (
+            (key === 'LT' || key === 'RT') ? btn.value > 0.15 : btn.value > 0.5
+          );
+          mappedButtons[key] = isPressed;
           mappedValues[key] = btn.value;
         }
       });
@@ -127,39 +133,11 @@ export const useGamepad = (): GamepadData => {
   };
 
   useEffect(() => {
-    const handleConnected = () => {
-      if (animationRef.current === null) {
-        animationRef.current = requestAnimationFrame(pollGamepad);
-      }
-    };
-
-    const handleDisconnected = () => {
-      // Check if any gamepads are still connected
-      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const anyConnected = Array.from(gamepads).some(g => g !== null);
-      
-      if (!anyConnected) {
-        if (animationRef.current !== null) {
-          cancelAnimationFrame(animationRef.current);
-          animationRef.current = null;
-        }
-        setGamepadState(INITIAL_STATE);
-      }
-    };
-
-    window.addEventListener('gamepadconnected', handleConnected);
-    window.addEventListener('gamepaddisconnected', handleDisconnected);
-
-    // Initial check in case gamepad is already connected
-    const existingGamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    const hasExisting = Array.from(existingGamepads).some(g => g !== null);
-    if (hasExisting) {
-      handleConnected();
-    }
+    // Start gamepad polling immediately on mount
+    animationRef.current = requestAnimationFrame(pollGamepad);
 
     return () => {
-      window.removeEventListener('gamepadconnected', handleConnected);
-      window.removeEventListener('gamepaddisconnected', handleDisconnected);
+      // Cancel polling loop on unmount
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
       }

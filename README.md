@@ -8,6 +8,7 @@
 
 ### 1. Gamepad Diagnostics & Tester Mode
 * **Giant Hero Controller**: A high-fidelity, interactive Xbox-style SVG overlay that maps inputs, button presses, and directional stick deflections in real-time.
+* **Driver-Agnostic Input Fallback**: Leverages a hybrid check combining `btn.pressed` with analog value thresholds (`value > 0.5` for digital face buttons/bumpers, `value > 0.15` for triggers) to guarantee input registration on Bluetooth controller drivers that fail to report standard pressed signals.
 * **Realistic Color Mapping**: Uses authentic Xbox standard layouts (A = Green, B = Red, X = Blue, Y = Yellow) when using the standard skin to accelerate layout recognition.
 * **Analog Stick Crosshairs**: Live circular visualizers mapping coordinate tilts (LS X/Y, RS X/Y) with a moving target dot.
 * **Trigger Depth Indicators**: Live ASCII bar fills (e.g., `LT ████████░░ 80%`) showing exact analog pressure percentages.
@@ -69,6 +70,10 @@ Presents detailed analytics modals after every single drill, comparing performan
 * **TypeScript** (Strong type-safety and interface contracts)
 * **Tailwind CSS** (Cyberpunk/Dark Mode responsive layout utility styling)
 * **Lucide Icons** (Premium interface telemetry icons)
+
+### Web Gamepad API Telemetry & Optimization
+* **Continuous High-Frequency Polling**: Uses a lightweight `requestAnimationFrame` loop (60 FPS) to poll active gamepads immediately on component mount, avoiding browser event listener race conditions or missing initial handshake states.
+* **Component-Safe Cleanup**: Ensures polling loops are canceled immediately when hooks/views unmount to prevent leaks in sandbox segments.
 
 ### Route-Splitting & Lazy Loading
 To achieve a blazing-fast initial page load, the 11 sandbox mini-games, the adventure campaign, and the 4 structured subsystems are **lazy-loaded** (`React.lazy` + `Suspense`). 

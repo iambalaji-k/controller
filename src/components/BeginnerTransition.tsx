@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
-  Calendar, CheckCircle2, Sparkles 
+  Calendar, CheckCircle2, Sparkles, Award
 } from 'lucide-react';
+import { ControllerView } from './ControllerView';
+import type { ButtonKey } from './ControllerView';
+import { audioFeedback } from '../utils/audio';
 
 interface CurriculumDay {
   dayNum: number;
@@ -20,9 +23,16 @@ export const BeginnerTransition: React.FC = () => {
 
   // Testing states
   const [activeDayTest, setActiveDayTest] = useState<CurriculumDay | null>(null);
-  const [simRunning, setSimRunning] = useState(false);
-  const [simAccuracy, setSimAccuracy] = useState(90);
+  const [gameState, setGameState] = useState<'idle' | 'countdown' | 'playing' | 'completed'>('idle');
+  const [countdown, setCountdown] = useState(3);
   const [testScore, setTestScore] = useState<number | null>(null);
+
+  // Real calibration states
+  const [prompts, setPrompts] = useState<{ action: string; button: ButtonKey }[]>([]);
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [correctHits, setCorrectHits] = useState(0);
+  const [reactionTimes, setReactionTimes] = useState<number[]>([]);
+  const [promptStartTime, setPromptStartTime] = useState(0);
 
   const DAYS: CurriculumDay[] = [
     { dayNum: 1, title: 'Face Buttons Foundation', focus: 'Visually recall A, B, X, Y cluster placement.', drillId: 'micro_adjustments', xpReward: 100 },
@@ -41,20 +51,95 @@ export const BeginnerTransition: React.FC = () => {
     { dayNum: 14, title: 'Mixed Combat Protocols', focus: 'Full layout coordination challenge exam.', drillId: 'slide_cancel', xpReward: 100 },
   ];
 
+  const generatePrompts = (day: CurriculumDay): { action: string; button: ButtonKey }[] => {
+    let pool: ButtonKey[] = ['A', 'B', 'X', 'Y'];
+    const dNum = day.dayNum;
+    if (dNum === 1) pool = ['A', 'B', 'X', 'Y'];
+    else if (dNum === 2) pool = ['A', 'B', 'X', 'Y', 'LB', 'RB'];
+    else if (dNum === 3) pool = ['LT', 'RT'];
+    else if (dNum === 4) pool = ['DpadUp', 'DpadDown', 'DpadLeft', 'DpadRight'];
+    else if (dNum === 5) pool = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT'];
+    else if (dNum === 6 || dNum === 7) pool = ['LeftStick', 'RightStick'];
+    else if (dNum === 8) pool = ['L3', 'R3'];
+    else if (dNum === 9) pool = ['L3', 'R3', 'LB', 'RB'];
+    else if (dNum === 10) pool = ['A', 'B', 'L3', 'R3', 'LT', 'RT'];
+    else if (dNum === 11) pool = ['B', 'A', 'X', 'Y'];
+    else if (dNum === 12) pool = ['RT', 'LB', 'LT', 'A'];
+    else if (dNum === 13) pool = ['B', 'RB', 'LB', 'R3'];
+    else pool = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'DpadUp', 'DpadDown', 'DpadLeft', 'DpadRight', 'L3', 'R3'];
+
+    const count = 10;
+    const generated: { action: string; button: ButtonKey }[] = [];
+    for (let i = 0; i < count; i++) {
+      const btn = pool[Math.floor(Math.random() * pool.length)];
+      let actName = `PRESS ${btn}`;
+      if (btn === 'LeftStick' || btn === 'RightStick') actName = `DEFLECT ${btn === 'LeftStick' ? 'LEFT' : 'RIGHT'} STICK`;
+      else if (btn === 'L3' || btn === 'R3') actName = `CLICK ${btn === 'L3' ? 'LEFT' : 'RIGHT'} STICK (L3/R3)`;
+      else if (btn === 'LT' || btn === 'RT') actName = `PULL ${btn === 'LT' ? 'LEFT' : 'RIGHT'} TRIGGER`;
+      else if (btn.startsWith('Dpad')) actName = `TAP DPAD ${btn.replace('Dpad', '')}`;
+      generated.push({ action: actName, button: btn });
+    }
+    return generated;
+  };
+
   const handleLaunch = (day: CurriculumDay) => {
     setActiveDayTest(day);
-    setSimRunning(false);
+    setGameState('idle');
     setTestScore(null);
+    setPrompts(generatePrompts(day));
     triggerHaptic('correct');
   };
 
-  const runSim = () => {
-    setSimRunning(true);
+  const startTrial = () => {
+    setGameState('countdown');
+    setCountdown(3);
     triggerHaptic('correct');
-    setTimeout(() => {
-      setSimRunning(false);
-      setTestScore(simAccuracy);
-    }, 2000);
+  };
+
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    if (gameState === 'countdown') {
+      if (countdown > 0) {
+        t = setTimeout(() => setCountdown(countdown - 1), 1000);
+      } else {
+        setGameState('playing');
+        setPromptIndex(0);
+        setCorrectHits(0);
+        setReactionTimes([]);
+        setPromptStartTime(performance.now());
+      }
+    }
+    return () => clearTimeout(t);
+  }, [gameState, countdown]);
+
+  const handleGamepadPress = (clickedButton: ButtonKey) => {
+    if (gameState !== 'playing' || !activeDayTest) return;
+
+    const currentPrompt = prompts[promptIndex];
+    const timeSpent = performance.now() - promptStartTime;
+
+    const isCorrect = clickedButton === currentPrompt.button;
+
+    if (isCorrect) {
+      triggerHaptic('correct');
+      audioFeedback.play('correct');
+      setCorrectHits(prev => prev + 1);
+      setReactionTimes(prev => [...prev, timeSpent]);
+    } else {
+      triggerHaptic('incorrect');
+      audioFeedback.play('incorrect');
+    }
+
+    const nextIdx = promptIndex + 1;
+    if (nextIdx >= prompts.length) {
+      const finalCorrect = isCorrect ? correctHits + 1 : correctHits;
+      const finalAccuracy = Math.round((finalCorrect / prompts.length) * 100);
+      setTestScore(finalAccuracy);
+      setGameState('completed');
+    } else {
+      setPromptIndex(nextIdx);
+      setPromptStartTime(performance.now());
+    }
   };
 
   const completeDay = () => {
@@ -69,6 +154,10 @@ export const BeginnerTransition: React.FC = () => {
   };
 
   const completedCount = Object.keys(progress).length;
+  const currentPrompt = prompts[promptIndex];
+  const avgSpeed = reactionTimes.length > 0 
+    ? Math.round(reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length) 
+    : 0;
 
   return (
     <div className="space-y-6 text-left">
@@ -147,63 +236,109 @@ export const BeginnerTransition: React.FC = () => {
             </div>
 
             {/* Sim HUD */}
-            <div className="py-6 bg-zinc-900/10 border border-zinc-905 rounded-2xl flex flex-col items-center justify-center">
-              {simRunning ? (
-                <div className="space-y-3">
-                  <div className="h-10 w-10 rounded-full border-2 border-brand-cyan border-t-transparent animate-spin mx-auto" />
-                  <span className="text-[10px] font-bold text-brand-cyan uppercase font-display animate-pulse">Running telemetry calibrations...</span>
-                </div>
-              ) : testScore !== null ? (
-                <div className="space-y-2">
-                  <span className="text-3xl font-black text-white font-display">{testScore}%</span>
-                  <span className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Day Status: {testScore >= 80 ? 'PASSED' : 'RETRY REQUIRED'}
-                  </span>
-                </div>
-              ) : (
+            <div className="py-6 bg-zinc-900/10 border border-zinc-900 rounded-2xl flex flex-col items-center justify-center w-full min-h-[140px]">
+              {gameState === 'idle' && (
                 <div className="space-y-1 py-2 text-xs text-zinc-500">
                   Ready to calibrate day trial.
                 </div>
               )}
-            </div>
 
-            {testScore === null && !simRunning && (
-              <div className="space-y-2 text-left w-full max-w-xs mx-auto">
-                <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase font-display">
-                  <span>Accuracy preset</span>
-                  <span className="text-brand-purple">{simAccuracy}%</span>
+              {gameState === 'countdown' && (
+                <div className="space-y-3">
+                  <div className="h-10 w-10 rounded-full border-2 border-brand-cyan border-t-transparent animate-spin mx-auto" />
+                  <span className="text-[12px] font-black text-brand-cyan uppercase font-display animate-pulse">{countdown}...</span>
                 </div>
-                <input 
-                  type="range" min="60" max="100" value={simAccuracy}
-                  onChange={(e) => setSimAccuracy(Number(e.target.value))}
-                  className="w-full accent-brand-purple bg-zinc-950 rounded-lg appearance-none h-1.5"
-                />
-              </div>
-            )}
+              )}
+
+              {gameState === 'playing' && currentPrompt && (
+                <div className="space-y-4 w-full px-4">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500 uppercase font-display">
+                    <span>Target Calibration</span>
+                    <span>Prompt {promptIndex + 1} / {prompts.length}</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-brand-purple font-display uppercase tracking-wider animate-pulse text-center">
+                    {currentPrompt.action}
+                  </h3>
+                  <div className="py-1">
+                    <ControllerView
+                      hidePanel={true}
+                      highlightedButton={currentPrompt.button}
+                      onButtonClick={handleGamepadPress}
+                      className="max-w-[280px] mx-auto"
+                    />
+                  </div>
+                  <div className="text-[10px] text-zinc-500 bg-zinc-900/50 p-2.5 rounded-xl border border-zinc-900 text-left space-y-1 font-mono max-w-xs mx-auto">
+                    <span className="block text-[8px] uppercase font-bold text-zinc-400 font-sans mb-1 text-center">Keyboard Helper Keys</span>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                      <span>Face Cluster: A/B/X/Y</span>
+                      <span>Bumpers: Q/L (LB) / E/R (RB)</span>
+                      <span>Triggers: 1 (LT) / 2 (RT)</span>
+                      <span>D-Pad: Arrow keys</span>
+                      <span>Clicks: 3 (L3) / 4 (R3)</span>
+                      <span>Sticks: 5 (LS) / 6 (RS)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {gameState === 'completed' && testScore !== null && (
+                <div className="space-y-4 w-full px-6">
+                  <div className="flex flex-col items-center">
+                    <div className="h-12 w-12 bg-brand-purple/10 border border-brand-purple/20 rounded-full flex items-center justify-center text-brand-purple">
+                      <Award className="h-6 w-6 animate-bounce" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 bg-zinc-950/60 border border-zinc-900 p-3 rounded-2xl text-left">
+                    <div>
+                      <span className="block text-[8px] uppercase font-bold text-zinc-500 font-display">Accuracy</span>
+                      <span className="text-lg font-black text-white font-mono">{testScore}%</span>
+                    </div>
+                    <div>
+                      <span className="block text-[8px] uppercase font-bold text-zinc-500 font-display">Avg Speed</span>
+                      <span className="text-lg font-black text-brand-cyan font-mono">{avgSpeed}ms</span>
+                    </div>
+                  </div>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Day Status: {testScore >= 80 ? 'PASSED' : 'RETRY REQUIRED'}
+                  </span>
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2 justify-end pt-2 border-t border-zinc-900">
               <button
                 onClick={() => setActiveDayTest(null)}
                 className="px-4 py-2 text-xs font-bold uppercase text-zinc-500 hover:text-zinc-300"
-                disabled={simRunning}
+                disabled={gameState === 'countdown' || gameState === 'playing'}
               >
                 Exit
               </button>
-              {testScore === null ? (
+              {gameState === 'idle' && (
                 <button
-                  onClick={runSim}
+                  onClick={startTrial}
                   className="px-5 py-2.5 rounded-xl bg-brand-cyan hover:bg-brand-cyan/95 text-zinc-950 text-xs font-black font-display uppercase tracking-wider shadow-lg shadow-brand-cyan/10"
-                  disabled={simRunning}
                 >
                   Start Day Calibration
                 </button>
-              ) : (
-                <button
-                  onClick={completeDay}
-                  className="px-5 py-2.5 rounded-xl bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-black font-display uppercase tracking-wider"
-                >
-                  {testScore >= 80 ? 'Complete Day' : 'Retry'}
-                </button>
+              )}
+              {gameState === 'completed' && testScore !== null && (
+                <>
+                  {testScore < 80 ? (
+                    <button
+                      onClick={startTrial}
+                      className="px-5 py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-500/95 text-zinc-950 text-xs font-black font-display uppercase tracking-wider"
+                    >
+                      Retry calibration
+                    </button>
+                  ) : (
+                    <button
+                      onClick={completeDay}
+                      className="px-5 py-2.5 rounded-xl bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-black font-display uppercase tracking-wider"
+                    >
+                      Submit Calibration Log
+                    </button>
+                  )}
+                </>
               )}
             </div>
 

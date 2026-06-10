@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { ControllerView } from './ControllerView';
 import type { ButtonKey } from './ControllerView';
+import { audioFeedback } from '../utils/audio';
 import { 
-  Play, Lock, CheckCircle2, Compass, Star 
+  Play, Lock, CheckCircle2, Compass, Star
 } from 'lucide-react';
 
 interface GuideLevel {
@@ -22,9 +24,16 @@ export const GuidedLearningPath: React.FC = () => {
   // Active testing modal state
   const [testingLevel, setTestingLevel] = useState<GuideLevel | null>(null);
   const [testActive, setTestActive] = useState(false);
+  const [gameState, setGameState] = useState<'idle' | 'countdown' | 'playing' | 'completed'>('idle');
+  const [countdown, setCountdown] = useState(3);
   const [testScore, setTestScore] = useState<number | null>(null);
-  const [simRunning, setSimRunning] = useState(false);
-  const [simAccuracy, setSimAccuracy] = useState(90);
+
+  // Real test telemetry states
+  const [prompts, setPrompts] = useState<{ action: string; button: ButtonKey }[]>([]);
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [correctHits, setCorrectHits] = useState(0);
+  const [reactionTimes, setReactionTimes] = useState<number[]>([]);
+  const [promptStartTime, setPromptStartTime] = useState(0);
 
   const LEVELS: GuideLevel[] = [
     {
@@ -119,29 +128,93 @@ export const GuidedLearningPath: React.FC = () => {
     }
   ];
 
+  const generatePrompts = (lvl: GuideLevel): { action: string; button: ButtonKey }[] => {
+    const pool = lvl.highlights;
+    const count = 10;
+    const generated: { action: string; button: ButtonKey }[] = [];
+    for (let i = 0; i < count; i++) {
+      const btn = pool[Math.floor(Math.random() * pool.length)];
+      let actName = `PRESS ${btn}`;
+      if (btn === 'LeftStick' || btn === 'RightStick') actName = `DEFLECT ${btn === 'LeftStick' ? 'LEFT' : 'RIGHT'} STICK`;
+      else if (btn === 'L3' || btn === 'R3') actName = `CLICK ${btn === 'L3' ? 'LEFT' : 'RIGHT'} STICK`;
+      else if (btn === 'LT' || btn === 'RT') actName = `PULL ${btn === 'LT' ? 'LEFT' : 'RIGHT'} TRIGGER`;
+      else if (btn.startsWith('Dpad')) actName = `TAP DPAD ${btn.replace('Dpad', '')}`;
+      generated.push({ action: actName, button: btn });
+    }
+    return generated;
+  };
+
   const handleLevelTestLaunch = (lvl: GuideLevel) => {
     setTestingLevel(lvl);
     setTestActive(true);
+    setGameState('idle');
     setTestScore(null);
-    setSimRunning(false);
+    setPrompts(generatePrompts(lvl));
   };
 
-  const runTestSimulation = () => {
-    setSimRunning(true);
+  const startTest = () => {
+    setGameState('countdown');
+    setCountdown(3);
     triggerHaptic('correct');
-    setTimeout(() => {
-      setSimRunning(false);
-      setTestScore(simAccuracy);
-    }, 2500);
+  };
+
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    if (gameState === 'countdown') {
+      if (countdown > 0) {
+        t = setTimeout(() => setCountdown(countdown - 1), 1000);
+      } else {
+        setGameState('playing');
+        setPromptIndex(0);
+        setCorrectHits(0);
+        setReactionTimes([]);
+        setPromptStartTime(performance.now());
+      }
+    }
+    return () => clearTimeout(t);
+  }, [gameState, countdown]);
+
+  const handleGamepadPress = (clickedButton: ButtonKey) => {
+    if (gameState !== 'playing' || !testingLevel) return;
+
+    const currentPrompt = prompts[promptIndex];
+    const timeSpent = performance.now() - promptStartTime;
+
+    const isCorrect = clickedButton === currentPrompt.button;
+
+    if (isCorrect) {
+      triggerHaptic('correct');
+      audioFeedback.play('correct');
+      setCorrectHits(prev => prev + 1);
+      setReactionTimes(prev => [...prev, timeSpent]);
+    } else {
+      triggerHaptic('incorrect');
+      audioFeedback.play('incorrect');
+    }
+
+    const nextIdx = promptIndex + 1;
+    if (nextIdx >= prompts.length) {
+      const finalCorrect = isCorrect ? correctHits + 1 : correctHits;
+      const finalAccuracy = Math.round((finalCorrect / prompts.length) * 100);
+      setTestScore(finalAccuracy);
+      setGameState('completed');
+    } else {
+      setPromptIndex(nextIdx);
+      setPromptStartTime(performance.now());
+    }
   };
 
   const completeTest = () => {
     if (!testingLevel || testScore === null) return;
     
+    const avgSpeed = reactionTimes.length > 0 
+      ? Math.round(reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length) 
+      : 205;
+
     // Log drill
     logDrillSession(testingLevel.drillId, {
       accuracy: testScore,
-      reactionTime: 205,
+      reactionTime: avgSpeed,
     });
 
     if (testScore >= 85) {
@@ -152,6 +225,11 @@ export const GuidedLearningPath: React.FC = () => {
     setTestActive(false);
     setTestingLevel(null);
   };
+
+  const currentPrompt = prompts[promptIndex];
+  const avgSpeed = reactionTimes.length > 0 
+    ? Math.round(reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length) 
+    : 0;
 
   return (
     <div className="space-y-6 text-left">
@@ -288,16 +366,56 @@ export const GuidedLearningPath: React.FC = () => {
             </div>
 
             {/* Test Animation HUD */}
-            <div className="py-6 bg-zinc-900/10 border border-zinc-900 rounded-2xl flex flex-col items-center justify-center space-y-4">
-              {simRunning ? (
+            <div className="py-6 bg-zinc-900/10 border border-zinc-900 rounded-2xl flex flex-col items-center justify-center space-y-4 w-full min-h-[140px]">
+              {gameState === 'idle' && (
+                <div className="space-y-1 py-4">
+                  <span className="text-xs text-zinc-500">Telemetry calibrator ready.</span>
+                  <p className="text-[10px] text-zinc-600 font-semibold">Exams test you on level key buttons in rapid succession.</p>
+                </div>
+              )}
+
+              {gameState === 'countdown' && (
                 <div className="space-y-3">
                   <div className="h-12 w-12 rounded-full border-2 border-brand-cyan border-t-transparent animate-spin mx-auto" />
                   <span className="text-xs font-bold text-brand-cyan uppercase font-display animate-pulse">
-                    Monitoring Telemetry Signals...
+                    Starting in {countdown}...
                   </span>
                 </div>
-              ) : testScore !== null ? (
-                <div className="space-y-2">
+              )}
+
+              {gameState === 'playing' && currentPrompt && (
+                <div className="space-y-4 w-full px-4">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500 uppercase font-display">
+                    <span>Active Target</span>
+                    <span>Prompt {promptIndex + 1} / {prompts.length}</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-brand-purple font-display uppercase tracking-wider animate-pulse text-center">
+                    {currentPrompt.action}
+                  </h3>
+                  <div className="py-1">
+                    <ControllerView
+                      hidePanel={true}
+                      highlightedButton={currentPrompt.button}
+                      onButtonClick={handleGamepadPress}
+                      className="max-w-[280px] mx-auto"
+                    />
+                  </div>
+                  <div className="text-[10px] text-zinc-500 bg-zinc-900/50 p-2.5 rounded-xl border border-zinc-900 text-left space-y-1 font-mono max-w-xs mx-auto">
+                    <span className="block text-[8px] uppercase font-bold text-zinc-400 font-sans mb-1 text-center">Keyboard Helper Keys</span>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                      <span>Face Cluster: A/B/X/Y</span>
+                      <span>Bumpers: Q/L (LB) / E/R (RB)</span>
+                      <span>Triggers: 1 (LT) / 2 (RT)</span>
+                      <span>D-Pad: Arrow keys</span>
+                      <span>Clicks: 3 (L3) / 4 (R3)</span>
+                      <span>Sticks: 5 (LS) / 6 (RS)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {gameState === 'completed' && testScore !== null && (
+                <div className="space-y-3 w-full px-6">
                   <span className="text-3xl font-black font-display text-white">{testScore}%</span>
                   <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                     Test Score: {testScore >= 85 ? 'PASSED' : 'FAILED'}
@@ -315,55 +433,53 @@ export const GuidedLearningPath: React.FC = () => {
                       />
                     ))}
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-1 py-4">
-                  <span className="text-xs text-zinc-500">Telemetry calibrator ready.</span>
-                  <p className="text-[10px] text-zinc-600">Simulates input speed trials mapping targets.</p>
+                  <div className="grid grid-cols-1 gap-2 bg-zinc-950/60 border border-zinc-900 p-2.5 rounded-xl text-left mt-2">
+                    <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase font-display">
+                      <span>Average Reaction Time</span>
+                      <span className="text-brand-cyan">{avgSpeed}ms</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Simulated preset slider */}
-            {testScore === null && !simRunning && (
-              <div className="space-y-2 text-left">
-                <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase font-display">
-                  <span>Simulated Calibration Accuracy</span>
-                  <span className="text-brand-purple">{simAccuracy}%</span>
-                </div>
-                <input 
-                  type="range" min="65" max="100" value={simAccuracy}
-                  onChange={(e) => setSimAccuracy(Number(e.target.value))}
-                  className="w-full accent-brand-purple bg-zinc-950 rounded-lg appearance-none h-1.5"
-                />
-              </div>
-            )}
 
             {/* CTA Actions */}
             <div className="flex gap-2 justify-end pt-2 border-t border-zinc-900">
               <button
                 onClick={() => setTestActive(false)}
                 className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
-                disabled={simRunning}
+                disabled={gameState === 'countdown' || gameState === 'playing'}
               >
                 Cancel
               </button>
               
-              {testScore === null ? (
+              {gameState === 'idle' && (
                 <button
-                  onClick={runTestSimulation}
+                  onClick={startTest}
                   className="px-5 py-2.5 rounded-xl bg-brand-cyan hover:bg-brand-cyan/95 text-zinc-950 text-xs font-black font-display uppercase tracking-wider"
-                  disabled={simRunning}
                 >
                   Initiate Trial
                 </button>
-              ) : (
-                <button
-                  onClick={completeTest}
-                  className="px-5 py-2.5 rounded-xl bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-black font-display uppercase tracking-wider"
-                >
-                  {testScore >= 85 ? 'Unlock Next Level' : 'Retry Exam'}
-                </button>
+              )}
+
+              {gameState === 'completed' && testScore !== null && (
+                <>
+                  {testScore < 85 ? (
+                    <button
+                      onClick={startTest}
+                      className="px-5 py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-500/95 text-zinc-950 text-xs font-black font-display uppercase tracking-wider"
+                    >
+                      Retry Exam
+                    </button>
+                  ) : (
+                    <button
+                      onClick={completeTest}
+                      className="px-5 py-2.5 rounded-xl bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-black font-display uppercase tracking-wider"
+                    >
+                      {testingLevel.levelNum === currentLevel && currentLevel < 10 ? 'Unlock Next Level' : 'Submit Review Score'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
 

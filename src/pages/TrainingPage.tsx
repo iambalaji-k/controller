@@ -1,7 +1,9 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Drill } from '../types';
-import { ControllerSvg } from '../components/ControllerSvg';
+import { ControllerView } from '../components/ControllerView';
+import type { ButtonKey } from '../components/ControllerView';
+import { audioFeedback } from '../utils/audio';
 import { 
   Target, Zap, Compass, Play, Lock, CheckCircle2, 
   Calendar, Award, Sliders, Flame, ChevronRight, ChevronLeft, X
@@ -36,17 +38,22 @@ const LoadingFallback: React.FC = () => (
 );
 
 export const TrainingPage: React.FC = () => {
-  const { categories, profile, logDrillSession, unlockCategory } = useApp();
+  const { categories, profile, logDrillSession, unlockCategory, triggerHaptic } = useApp();
   const [activeTab, setActiveTab] = useState<'guided' | 'workouts' | 'transition' | 'exams' | 'campaign' | 'sandbox'>('guided');
   const [activeSandboxTab, setActiveSandboxTab] = useState<'menu' | 'recognition' | 'reflex' | 'memory' | 'mechanics' | 'combos' | 'rhythm' | 'stick' | 'layouts' | 'trigger' | 'dpad' | 'click'>('menu');
   
   // Drill simulator modal state
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simulationStep, setSimulationStep] = useState<'idle' | 'running' | 'completed'>('idle');
-  const [timer, setTimer] = useState(4);
-  const [activePart, setActivePart] = useState<'left-stick' | 'right-stick' | 'dpad' | 'buttons' | 'triggers' | null>(null);
   
+  // Real calibration states
+  const [drillGameState, setDrillGameState] = useState<'idle' | 'countdown' | 'playing' | 'completed'>('idle');
+  const [drillCountdown, setDrillCountdown] = useState(3);
+  const [drillPrompts, setDrillPrompts] = useState<{ action: string; button: ButtonKey }[]>([]);
+  const [drillPromptIndex, setDrillPromptIndex] = useState(0);
+  const [drillCorrectHits, setDrillCorrectHits] = useState(0);
+  const [drillReactionTimes, setDrillReactionTimes] = useState<number[]>([]);
+  const [drillPromptStartTime, setDrillPromptStartTime] = useState(0);
+
   // Mock performance results options
   const [mockAccuracy, setMockAccuracy] = useState(90);
   const [mockReactionTime, setMockReactionTime] = useState(210);
@@ -61,40 +68,102 @@ export const TrainingPage: React.FC = () => {
     }
   };
 
-  // Run simulation timer and gamepad animations
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isSimulating && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-        
-        // Cycle active controller parts to simulate input
-        const parts: ('left-stick' | 'right-stick' | 'dpad' | 'buttons' | 'triggers')[] = [
-          'left-stick', 'right-stick', 'buttons', 'triggers', 'dpad'
-        ];
-        const randomPart = parts[Math.floor(Math.random() * parts.length)];
-        setActivePart(randomPart);
-      }, 800);
-    } else if (timer === 0 && isSimulating) {
-      setIsSimulating(false);
-      setSimulationStep('completed');
-      setActivePart(null);
+  const generateDrillPrompts = (drillId: string): { action: string; button: ButtonKey }[] => {
+    let pool: ButtonKey[] = ['A', 'B', 'X', 'Y'];
+    if (drillId === 'micro_adjustments') {
+      pool = ['A', 'B', 'X', 'Y', 'DpadUp', 'DpadDown', 'DpadLeft', 'DpadRight'];
+    } else if (drillId === 'target_snap') {
+      pool = ['A', 'B', 'X', 'Y', 'LB', 'RB'];
+    } else if (drillId === 'reaction_snap') {
+      pool = ['A', 'B', 'X', 'Y', 'LT', 'RT'];
+    } else if (drillId === 'slow_tracking') {
+      pool = ['LeftStick', 'RightStick'];
+    } else if (drillId === 'strafe_aim') {
+      pool = ['L3', 'R3'];
+    } else if (drillId === 'slide_cancel') {
+      pool = ['B', 'A', 'RightStick', 'X'];
+    } else {
+      pool = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'DpadUp', 'DpadDown', 'DpadLeft', 'DpadRight', 'L3', 'R3'];
     }
 
-    return () => clearInterval(interval);
-  }, [isSimulating, timer]);
+    const count = 10;
+    const generated: { action: string; button: ButtonKey }[] = [];
+    for (let i = 0; i < count; i++) {
+      const btn = pool[Math.floor(Math.random() * pool.length)];
+      let actName = `PRESS ${btn}`;
+      if (btn === 'LeftStick' || btn === 'RightStick') actName = `DEFLECT ${btn === 'LeftStick' ? 'LEFT' : 'RIGHT'} STICK`;
+      else if (btn === 'L3' || btn === 'R3') actName = `CLICK ${btn === 'L3' ? 'LEFT' : 'RIGHT'} STICK`;
+      else if (btn === 'LT' || btn === 'RT') actName = `PULL ${btn === 'LT' ? 'LEFT' : 'RIGHT'} TRIGGER`;
+      else if (btn.startsWith('Dpad')) actName = `TAP DPAD ${btn.replace('Dpad', '')}`;
+      generated.push({ action: actName, button: btn });
+    }
+    return generated;
+  };
 
   const startDrillSimulation = (drill: Drill) => {
     setSelectedDrill(drill);
-    setSimulationStep('running');
-    setTimer(4);
-    setIsSimulating(true);
+    setDrillGameState('idle');
+    setDrillPrompts(generateDrillPrompts(drill.id));
+  };
+
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    if (drillGameState === 'countdown') {
+      if (drillCountdown > 0) {
+        t = setTimeout(() => setDrillCountdown(drillCountdown - 1), 1000);
+      } else {
+        setDrillGameState('playing');
+        setDrillPromptIndex(0);
+        setDrillCorrectHits(0);
+        setDrillReactionTimes([]);
+        setDrillPromptStartTime(performance.now());
+      }
+    }
+    return () => clearTimeout(t);
+  }, [drillGameState, drillCountdown]);
+
+  const handleDrillGamepadPress = (clickedButton: ButtonKey) => {
+    if (drillGameState !== 'playing' || !selectedDrill) return;
+
+    const currentPrompt = drillPrompts[drillPromptIndex];
+    const timeSpent = performance.now() - drillPromptStartTime;
+
+    const isCorrect = clickedButton === currentPrompt.button;
+
+    if (isCorrect) {
+      triggerHaptic('correct');
+      audioFeedback.play('correct');
+      setDrillCorrectHits(prev => prev + 1);
+      setDrillReactionTimes(prev => [...prev, timeSpent]);
+    } else {
+      triggerHaptic('incorrect');
+      audioFeedback.play('incorrect');
+    }
+
+    const nextIdx = drillPromptIndex + 1;
+    if (nextIdx >= drillPrompts.length) {
+      const finalCorrect = isCorrect ? drillCorrectHits + 1 : drillCorrectHits;
+      const finalAccuracy = Math.round((finalCorrect / drillPrompts.length) * 100);
+      const finalSpeed = drillReactionTimes.length > 0 
+        ? Math.round(drillReactionTimes.reduce((a, b) => a + b, 0) / drillReactionTimes.length) 
+        : 220;
+
+      setMockAccuracy(finalAccuracy);
+      setMockReactionTime(finalSpeed);
+      const speedScore = Math.max(50, Math.min(100, Math.round(100 - (finalSpeed - 150) / 4)));
+      setMockSpeed(speedScore);
+
+      setDrillGameState('completed');
+    } else {
+      setDrillPromptIndex(nextIdx);
+      setDrillPromptStartTime(performance.now());
+    }
   };
 
   const handlePerformancePreset = (tier: 'gold' | 'silver' | 'bronze') => {
     if (tier === 'gold') {
       setMockAccuracy(96);
-      setMockReactionTime(175); // Should trigger speed_demon achievement!
+      setMockReactionTime(175);
       setMockSpeed(94);
     } else if (tier === 'silver') {
       setMockAccuracy(88);
@@ -110,7 +179,6 @@ export const TrainingPage: React.FC = () => {
   const submitDrillLog = () => {
     if (!selectedDrill) return;
 
-    // Generate simulated button mistakes based on mock accuracy
     const mistakeHistory: Record<string, number> = {};
     if (mockAccuracy < 100) {
       const BUTTONS = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'DpadUp', 'DpadDown', 'DpadLeft', 'DpadRight'];
@@ -128,9 +196,8 @@ export const TrainingPage: React.FC = () => {
       buttonMistakes: mistakeHistory
     });
 
-    // Reset modal state
     setSelectedDrill(null);
-    setSimulationStep('idle');
+    setDrillGameState('idle');
   };
 
   const handleUnlockCategory = (catId: string) => {
@@ -477,7 +544,7 @@ export const TrainingPage: React.FC = () => {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-brand-cyan">Calibration Practice Module</span>
                 <h3 className="text-base font-extrabold text-white font-display uppercase">{selectedDrill.title}</h3>
               </div>
-              {simulationStep !== 'running' && (
+              {drillGameState !== 'countdown' && drillGameState !== 'playing' && (
                 <button
                   onClick={() => setSelectedDrill(null)}
                   className="text-zinc-500 hover:text-zinc-300 p-1 bg-zinc-800/40 rounded-lg transition-colors"
@@ -490,35 +557,76 @@ export const TrainingPage: React.FC = () => {
             {/* Modal Body */}
             <div className="p-6 flex-1 overflow-y-auto flex flex-col items-center justify-center text-center space-y-6">
               
-              {simulationStep === 'running' && (
-                <div className="space-y-6 w-full flex flex-col items-center">
-                  {/* Countdown number */}
-                  <div className="h-20 w-20 rounded-full bg-zinc-900 border-2 border-brand-cyan/50 flex items-center justify-center text-white text-3xl font-black font-display animate-pulse shadow-lg shadow-brand-cyan/10">
-                    {timer}s
-                  </div>
-                  
-                  <div className="w-full max-w-[200px]">
-                    <ControllerSvg type={profile.controllerType} activePart={activePart} />
-                  </div>
+              {drillGameState === 'idle' && (
+                <div className="space-y-4 py-6 text-center">
+                  <span className="text-xs text-zinc-400 font-semibold block">
+                    {selectedDrill.description}
+                  </span>
+                  <p className="text-[11px] text-zinc-500 max-w-xs mx-auto">
+                    This training module will test your ability to press key inputs rapidly and accurately. Ready to initiate?
+                  </p>
+                  <button
+                    onClick={() => {
+                      setDrillGameState('countdown');
+                      setDrillCountdown(3);
+                      triggerHaptic('correct');
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-brand-cyan hover:bg-brand-cyan/95 text-zinc-950 text-xs font-black font-display uppercase tracking-wider shadow-lg shadow-brand-cyan/10"
+                  >
+                    Start Calibration Drill
+                  </button>
+                </div>
+              )}
 
-                  <div className="space-y-1">
-                    <span className="text-xs font-semibold text-brand-purple uppercase tracking-wider animate-pulse font-display">
-                      Intercepting Controller Telemetry...
-                    </span>
-                    <p className="text-[10px] text-zinc-500 max-w-xs">
-                      Simulating stick tilt movements and bumper presses to register accuracy indices.
-                    </p>
+              {drillGameState === 'countdown' && (
+                <div className="space-y-6 w-full flex flex-col items-center">
+                  <div className="h-20 w-20 rounded-full bg-zinc-900 border-2 border-brand-cyan/50 flex items-center justify-center text-white text-3xl font-black font-display animate-pulse shadow-lg shadow-brand-cyan/10">
+                    {drillCountdown}...
+                  </div>
+                  <span className="text-xs font-bold text-brand-cyan uppercase font-display animate-pulse">
+                    Preparing Telemetry Sensors
+                  </span>
+                </div>
+              )}
+
+              {drillGameState === 'playing' && drillPrompts[drillPromptIndex] && (
+                <div className="space-y-4 w-full flex flex-col items-center">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500 uppercase font-display w-full max-w-md">
+                    <span>Target Calibration</span>
+                    <span>Prompt {drillPromptIndex + 1} / {drillPrompts.length}</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-brand-purple font-display uppercase tracking-wider animate-pulse text-center">
+                    {drillPrompts[drillPromptIndex].action}
+                  </h3>
+                  <div className="w-full max-w-[280px]">
+                    <ControllerView
+                      hidePanel={true}
+                      highlightedButton={drillPrompts[drillPromptIndex].button}
+                      onButtonClick={handleDrillGamepadPress}
+                      className="mx-auto"
+                    />
+                  </div>
+                  <div className="text-[10px] text-zinc-500 bg-zinc-900/50 p-2.5 rounded-xl border border-zinc-900 text-left space-y-1 font-mono max-w-xs mx-auto">
+                    <span className="block text-[8px] uppercase font-bold text-zinc-400 font-sans mb-1 text-center">Keyboard Helper Keys</span>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                      <span>Face Cluster: A/B/X/Y</span>
+                      <span>Bumpers: Q/L (LB) / E/R (RB)</span>
+                      <span>Triggers: 1 (LT) / 2 (RT)</span>
+                      <span>D-Pad: Arrow keys</span>
+                      <span>Clicks: 3 (L3) / 4 (R3)</span>
+                      <span>Sticks: 5 (LS) / 6 (RS)</span>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {simulationStep === 'completed' && (
+              {drillGameState === 'completed' && (
                 <div className="space-y-6 w-full text-left">
                   <div className="flex items-center gap-3 p-4 bg-brand-green/10 border border-brand-green/20 rounded-2xl">
                     <CheckCircle2 className="h-8 w-8 text-brand-green flex-shrink-0" />
                     <div>
                       <h4 className="text-sm font-bold text-white uppercase font-display">Telemetry Log Synthesized!</h4>
-                      <p className="text-[10px] text-zinc-400">Select a performance profile below to simulate score submission & XP calculations.</p>
+                      <p className="text-[10px] text-zinc-400">Your practice results are mapped below. You can save or adjust them before syncing.</p>
                     </div>
                   </div>
 
@@ -602,11 +710,11 @@ export const TrainingPage: React.FC = () => {
               <button
                 onClick={() => setSelectedDrill(null)}
                 className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
-                disabled={simulationStep === 'running'}
+                disabled={drillGameState === 'countdown' || drillGameState === 'playing'}
               >
                 Discard
               </button>
-              {simulationStep === 'completed' && (
+              {drillGameState === 'completed' && (
                 <button
                   onClick={submitDrillLog}
                   className="px-5 py-2 rounded-xl bg-brand-cyan hover:bg-brand-cyan/90 text-zinc-950 text-xs font-black font-display uppercase tracking-wider shadow-lg shadow-brand-cyan/20 transition-all duration-200"

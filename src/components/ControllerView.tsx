@@ -37,31 +37,58 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
   
   const [pressedHistory, setPressedHistory] = useState<string[]>([]);
   
-  // Track previous gamepad state for button press logging
-  const prevGamepadButtons = useRef<Record<string, boolean>>({});
-
-  // Monitor physical button press transitions
-  useEffect(() => {
+  // Evaluate final active state of a button (merged mouse + physical controller + keyboard)
+  const isButtonActive = (key: ButtonKey): boolean => {
     if (gamepad.connected) {
-      Object.keys(gamepad.buttons).forEach((key) => {
-        const wasPressed = prevGamepadButtons.current[key];
-        const isPressed = gamepad.buttons[key];
-        if (isPressed && !wasPressed) {
-          setPressedHistory((prev) => [`[GAMEPAD] ${key}`, ...prev.slice(0, 7)]);
-          audioFeedback.play('click');
-          if (onButtonClick) {
-            onButtonClick(key as ButtonKey);
-          }
-        }
-      });
-      prevGamepadButtons.current = { ...gamepad.buttons };
+      if (key === 'LeftStick') {
+        return Math.abs(gamepad.axes[0]) > 0.3 || Math.abs(gamepad.axes[1]) > 0.3 || mousePressedButtons[key];
+      }
+      if (key === 'RightStick') {
+        return Math.abs(gamepad.axes[2]) > 0.3 || Math.abs(gamepad.axes[3]) > 0.3 || mousePressedButtons[key];
+      }
+      if (gamepad.buttons[key] !== undefined) {
+        return gamepad.buttons[key] || mousePressedButtons[key];
+      }
     }
-  }, [gamepad.buttons, gamepad.connected, onButtonClick]);
+    return mousePressedButtons[key];
+  };
+
+  // Track previous active states to monitor transitions
+  const prevActiveStates = useRef<Record<ButtonKey, boolean>>({
+    A: false, B: false, X: false, Y: false,
+    LB: false, RB: false, LT: false, RT: false,
+    DpadUp: false, DpadDown: false, DpadLeft: false, DpadRight: false,
+    LeftStick: false, L3: false, RightStick: false, R3: false,
+    Start: false, Back: false, Guide: false,
+  });
+
+  // Unified transition monitor for physical, mouse, and keyboard inputs
+  useEffect(() => {
+    const keys: ButtonKey[] = [
+      'A', 'B', 'X', 'Y', 
+      'LB', 'RB', 'LT', 'RT', 
+      'DpadUp', 'DpadDown', 'DpadLeft', 'DpadRight',
+      'LeftStick', 'L3', 'RightStick', 'R3',
+      'Start', 'Back', 'Guide'
+    ];
+    keys.forEach((key) => {
+      const wasActive = prevActiveStates.current[key];
+      const isActive = isButtonActive(key);
+      if (isActive && !wasActive) {
+        console.log(`[ControllerView Transition] ${key} went active. Calling onButtonClick.`);
+        setPressedHistory((prev) => [`[ACTIVE] ${key}`, ...prev.slice(0, 7)]);
+        audioFeedback.play('click');
+        if (onButtonClick) {
+          onButtonClick(key);
+        }
+      }
+      prevActiveStates.current[key] = isActive;
+    });
+  }, [gamepad, mousePressedButtons, onButtonClick]);
 
   // Keyboard navigation fallback
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid intercepting inputs in text fields
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
         return;
       }
@@ -71,8 +98,10 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
         case 'b': key = 'B'; break;
         case 'x': key = 'X'; break;
         case 'y': key = 'Y'; break;
-        case 'q': key = 'LB'; break;
-        case 'e': key = 'RB'; break;
+        case 'q':
+        case 'l': key = 'LB'; break;
+        case 'e':
+        case 'r': key = 'RB'; break;
         case '1': key = 'LT'; break;
         case '2': key = 'RT'; break;
         case 'arrowup': key = 'DpadUp'; break;
@@ -82,15 +111,18 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
         case 'enter': key = 'Start'; break;
         case 'escape':
         case 'backspace': key = 'Back'; break;
-        case '3':
-        case 'l': key = 'L3'; break;
-        case '4':
-        case 'r': key = 'R3'; break;
+        case '3': key = 'L3'; break;
+        case '4': key = 'R3'; break;
+        case '5': key = 'LeftStick'; break;
+        case '6': key = 'RightStick'; break;
         default: break;
       }
 
       if (key) {
+        console.log(`[ControllerView KeyDown] Key: ${e.key}, mapped to ButtonKey: ${key}`);
         handleMousePress(key);
+      } else {
+        console.log(`[ControllerView KeyDown] Key: ${e.key} not mapped.`);
       }
     };
 
@@ -101,8 +133,10 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
         case 'b': key = 'B'; break;
         case 'x': key = 'X'; break;
         case 'y': key = 'Y'; break;
-        case 'q': key = 'LB'; break;
-        case 'e': key = 'RB'; break;
+        case 'q':
+        case 'l': key = 'LB'; break;
+        case 'e':
+        case 'r': key = 'RB'; break;
         case '1': key = 'LT'; break;
         case '2': key = 'RT'; break;
         case 'arrowup': key = 'DpadUp'; break;
@@ -112,14 +146,15 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
         case 'enter': key = 'Start'; break;
         case 'escape':
         case 'backspace': key = 'Back'; break;
-        case '3':
-        case 'l': key = 'L3'; break;
-        case '4':
-        case 'r': key = 'R3'; break;
+        case '3': key = 'L3'; break;
+        case '4': key = 'R3'; break;
+        case '5': key = 'LeftStick'; break;
+        case '6': key = 'RightStick'; break;
         default: break;
       }
 
       if (key) {
+        console.log(`[ControllerView KeyUp] Key: ${e.key}, mapped to ButtonKey: ${key}`);
         handleMouseRelease(key);
       }
     };
@@ -130,28 +165,15 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [onButtonClick]);
+  }, []);
 
   // Trigger click simulation for mouse fallback
   const handleMousePress = (key: ButtonKey) => {
     setMousePressedButtons((prev) => ({ ...prev, [key]: true }));
-    setPressedHistory((prev) => [`[MOUSE] ${key}`, ...prev.slice(0, 7)]);
-    audioFeedback.play('click');
-    if (onButtonClick) {
-      onButtonClick(key);
-    }
   };
 
   const handleMouseRelease = (key: ButtonKey) => {
     setMousePressedButtons((prev) => ({ ...prev, [key]: false }));
-  };
-
-  // Evaluate final active state of a button (merged mouse + physical controller)
-  const isButtonActive = (key: ButtonKey): boolean => {
-    if (gamepad.connected && gamepad.buttons[key] !== undefined) {
-      return gamepad.buttons[key] || mousePressedButtons[key];
-    }
-    return mousePressedButtons[key];
   };
 
   // Get current trigger pressure (ranges from 0 to 1)
@@ -331,13 +353,13 @@ export const ControllerView: React.FC<ControllerViewProps> = React.memo(({
       {/* B Button */}
       <g onMouseEnter={() => setHoveredButton('B')} onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('B'); }} onMouseDown={() => handleMousePress('B')} onMouseUp={() => handleMouseRelease('B')} className="cursor-pointer">
         <circle cx="875" cy="293" r="35" fill={getButtonColor('B')} stroke={hoveredButton === 'B' || isButtonActive('B') || highlightedButton === 'B' ? '#ef4444' : '#b91c1c'} strokeWidth="2" filter={isButtonActive('B') ? 'url(#xbox-glow)' : 'none'} />
-        <path d="M805.044 337L822.858 382.24H815.809L811 369H794.5L788.639 382.24H783L801.754 337H805.044ZM803 347L795.5 365.409H811L803 347Z" fill={isButtonActive('B') ? '#fff' : '#f87171'} pointerEvents="none" />
+        <path d="M861.808 272.086H875.222C884.706 272.086 888.935 277.17 888.935 283.065C888.935 287.807 886.287 291.267 882.1 292.976C887.483 293.916 891.028 298.06 891.028 303.955C891.028 311.303 885.646 315.746 877.273 315.746H861.808V272.086ZM867.191 276.315V290.883H872.616C879.879 290.883 883.339 287.807 883.339 282.937C883.339 278.75 880.263 276.315 874.24 276.315H867.191ZM867.191 294.898V311.046H876.205C882.228 311.046 885.304 308.227 885.304 302.972C885.304 297.675 880.519 294.898 872.872 294.898H867.191Z" fill={isButtonActive('B') ? '#fff' : '#f87171'} pointerEvents="none" />
       </g>
 
       {/* A Button */}
       <g onMouseEnter={() => setHoveredButton('A')} onMouseLeave={() => { setHoveredButton(null); handleMouseRelease('A'); }} onMouseDown={() => handleMousePress('A')} onMouseUp={() => handleMouseRelease('A')} className="cursor-pointer">
         <circle cx="804" cy="362" r="35" fill={getButtonColor('A')} stroke={hoveredButton === 'A' || isButtonActive('A') || highlightedButton === 'A' ? '#10b981' : '#047857'} strokeWidth="2" filter={isButtonActive('A') ? 'url(#xbox-glow)' : 'none'} />
-        <path d="M861.808 272.086H875.222C884.706 272.086 888.935 277.17 888.935 283.065C888.935 287.807 886.287 291.267 882.1 292.976C887.483 293.916 891.028 298.06 891.028 303.955C891.028 311.303 885.646 315.746 877.273 315.746H861.808V272.086ZM867.191 276.315V290.883H872.616C879.879 290.883 883.339 287.807 883.339 282.937C883.339 278.75 880.263 276.315 874.24 276.315H867.191ZM867.191 294.898V311.046H876.205C882.228 311.046 885.304 308.227 885.304 302.972C885.304 297.675 880.519 294.898 872.872 294.898H867.191Z" fill={isButtonActive('A') ? '#fff' : '#10b981'} pointerEvents="none" />
+        <path d="M805.044 337L822.858 382.24H815.809L811 369H794.5L788.639 382.24H783L801.754 337H805.044ZM803 347L795.5 365.409H811L803 347Z" fill={isButtonActive('A') ? '#fff' : '#10b981'} pointerEvents="none" />
       </g>
 
       {/* X Button */}
